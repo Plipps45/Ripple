@@ -1,0 +1,8 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+bin/yt-dlp*
+bin/ffmpeg*
+bin/ffprobe*
+*.log
+.DS_Store

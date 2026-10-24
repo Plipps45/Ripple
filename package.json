@@ -1,0 +1,17 @@
+{
+  "name": "ripple",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ripple audio player (Tauri + Rust).",
+  "author": "Weebec",
+  "license": "MIT",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "test": "node --test \"tests/unit/*.test.js\" tests/server.test.js"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.3"
+  }
+}

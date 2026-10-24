@@ -1,0 +1,2625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Ripple - Setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-color: #caece2;
+      --container-fill: #f2fbf7;
+      --container-fill-hover: #f8fdfb;
+      --card-bg: #dcefe7;
+      --card-bg-hover: #d0e8de;
+      --text-color: #13302a;
+      --hero-text: #176b5f;
+      --mark: #3fb3a1;
+
+      --btn-bg: #176b5f;
+      --btn-text: #ffffff;
+      --btn-bg-hover: #1d7d6f;
+      --btn-secondary-bg: #b5dfcf;
+      --btn-secondary-hover: #a6d6c3;
+
+      --slider-track: #c3dfd3;
+      --ripple-color: rgba(255, 255, 255, 0.25);
+
+      --font-ui: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+
+      --top: 76px;
+      --foot: 88px;
+      --S: min(30vh, 40vw, 250px);
+      --hy: 37vh;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    body {
+      --line: color-mix(in srgb, var(--text-color) 12%, transparent);
+      --line-strong: color-mix(in srgb, var(--text-color) 24%, transparent);
+      --hero-soft: color-mix(in srgb, var(--hero-text) 22%, transparent);
+      --hero-faint: color-mix(in srgb, var(--hero-text) 10%, transparent);
+      background-color: var(--bg-color);
+      color: var(--hero-text);
+      font-family: var(--font-ui);
+      transition: background-color 0.4s ease, color 0.4s ease;
+      -webkit-app-region: drag;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      background: none;
+      border: 0;
+      outline: none;
+    }
+
+    .win-controls,
+    .btn,
+    .scroller,
+    input {
+      -webkit-app-region: no-drag;
+    }
+
+    :focus-visible {
+      outline: 2px solid currentColor !important;
+      outline-offset: 3px;
+    }
+
+    body.no-hand-cursor * {
+      cursor: default !important;
+    }
+
+    body.no-hand-cursor .field {
+      cursor: text !important;
+    }
+
+    .is-hidden {
+      display: none !important;
+    }
+
+    .win-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .win-controls.no-api .win-icon {
+      display: none;
+    }
+
+    .btn.win-icon {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      justify-content: center;
+      border-radius: 12px;
+    }
+
+    .btn.win-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .setup-viewport {
+      position: fixed;
+      inset: 0;
+      transition: opacity 0.5s ease, filter 0.5s ease, transform 0.6s var(--ease-out);
+    }
+
+    .setup-viewport.closing {
+      opacity: 0;
+      filter: blur(12px);
+      transform: scale(0.97);
+      pointer-events: none;
+    }
+
+    .ambient {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+
+    .setup-viewport:not([data-step="1"]) .ambient {
+      opacity: 1;
+    }
+
+    .ambient span {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: var(--r);
+      height: var(--r);
+      border-radius: 50%;
+      border: 1.5px dashed var(--hero-faint);
+      transform: translate(-50%, -50%);
+      animation: ambientSpin 140s linear infinite;
+    }
+
+    .ambient span:nth-child(1) { --r: 46vmax; }
+    .ambient span:nth-child(2) { --r: 74vmax; animation-direction: reverse; border-style: solid; }
+    .ambient span:nth-child(3) { --r: 104vmax; animation-duration: 200s; }
+
+    @keyframes ambientSpin {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    .fx {
+      position: absolute;
+      left: 50%;
+      top: var(--hy);
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    .setup-viewport:not([data-step="1"]) .fx {
+      opacity: 0;
+    }
+
+    .fx > * {
+      position: absolute;
+      left: 0;
+      top: 0;
+      border-radius: 50%;
+      opacity: 0;
+    }
+
+    .glow {
+      width: calc(var(--S) * 2.6);
+      height: calc(var(--S) * 2.6);
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, color-mix(in srgb, var(--hero-text) 14%, transparent), transparent 62%);
+    }
+
+    body.intro .glow {
+      animation: glowIn 1.6s 0.7s ease-out forwards;
+    }
+
+    @keyframes glowIn {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+      100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+
+    .drop {
+      width: 16px;
+      height: 16px;
+      background-color: var(--hero-text);
+    }
+
+    body.intro .drop {
+      animation: dropFall 0.72s 0.1s both;
+    }
+
+    @keyframes dropFall {
+      0% { opacity: 0; transform: translate(-50%, calc(-50% - 52vh)) scale(0.5, 1.7); animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+      12% { opacity: 1; }
+      82% { opacity: 1; transform: translate(-50%, -50%) scale(0.8, 1.6); animation-timing-function: ease-out; }
+      90% { transform: translate(-50%, -50%) scale(2.2, 0.45); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+    }
+
+    .splash {
+      width: 0;
+      height: 0;
+      border: 5px solid var(--hero-text);
+      transform: translate(-50%, -50%);
+    }
+
+    body.intro .splash {
+      animation: splash 1.5s cubic-bezier(0.1, 0.7, 0.3, 1) both;
+    }
+
+    body.intro .splash:nth-of-type(1) { animation-delay: 0.7s; }
+    body.intro .splash:nth-of-type(2) { animation-delay: 0.84s; }
+    body.intro .splash:nth-of-type(3) { animation-delay: 1s; }
+    body.intro .splash:nth-of-type(4) { animation-delay: 2.05s; animation-duration: 1.8s; }
+
+    @keyframes splash {
+      0% { opacity: 0.9; width: 0; height: 0; border-width: 5px; }
+      100% { opacity: 0; width: 95vmin; height: 95vmin; border-width: 1px; }
+    }
+
+    .spark {
+      width: 7px;
+      height: 7px;
+      background-color: var(--hero-text);
+    }
+
+    body.intro .spark {
+      animation: spark 0.8s 0.74s cubic-bezier(0.2, 0.8, 0.4, 1) both;
+    }
+
+    @keyframes spark {
+      0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--a)) translateX(6px) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--d)) scale(0.2); }
+    }
+
+    .wave {
+      width: var(--S);
+      height: var(--S);
+      border: 1.5px solid var(--hero-text);
+      transform: translate(-50%, -50%);
+    }
+
+    body.intro .wave {
+      animation: wave 6s cubic-bezier(0.2, 0.6, 0.4, 1) infinite backwards;
+    }
+
+    body.intro .wave:nth-of-type(1) { animation-delay: 2.6s; }
+    body.intro .wave:nth-of-type(2) { animation-delay: 4.1s; }
+    body.intro .wave:nth-of-type(3) { animation-delay: 5.6s; }
+    body.intro .wave:nth-of-type(4) { animation-delay: 7.1s; }
+
+    .setup-viewport:not([data-step="1"]) .wave {
+      animation-play-state: paused;
+    }
+
+    @keyframes wave {
+      0% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.9); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(3.4); }
+    }
+
+    .mark {
+      position: absolute;
+      z-index: 5;
+      left: calc(50% - var(--S) / 2);
+      top: calc(var(--hy) - var(--S) / 2);
+      width: var(--S);
+      height: var(--S);
+      color: var(--mark, var(--hero-text));
+      pointer-events: none;
+      transition:
+        left 1s var(--ease-out),
+        top 1s var(--ease-out),
+        width 1s var(--ease-out),
+        height 1s var(--ease-out),
+        color 0.4s ease;
+    }
+
+    .setup-viewport:not([data-step="1"]) .mark {
+      left: 22px;
+      top: calc(var(--top) / 2 - 20px);
+      width: 40px;
+      height: 40px;
+    }
+
+    .mark-turn,
+    .mark-idle,
+    .mark svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .mark-turn {
+      transition: rotate 1.1s cubic-bezier(0.34, 1.45, 0.5, 1);
+    }
+
+    [data-step="2"] .mark-turn { rotate: 120deg; }
+    [data-step="3"] .mark-turn { rotate: 240deg; }
+    [data-step="4"] .mark-turn { rotate: 360deg; }
+    [data-step="5"] .mark-turn { rotate: 480deg; }
+
+    body.intro .mark-idle {
+      animation:
+        idleSpin 48s 2.1s linear infinite,
+        markPulse 0.9s 2s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+    }
+
+    @keyframes idleSpin {
+      to { rotate: 360deg; }
+    }
+
+    @keyframes markPulse {
+      0% { scale: 1; }
+      35% { scale: 1.09; }
+      100% { scale: 1; }
+    }
+
+    .blade {
+      transform-box: view-box;
+      transform-origin: 50.1px 50.8px;
+      opacity: 0;
+    }
+
+    .blade-fill {
+      fill: currentColor;
+      opacity: 0;
+    }
+
+    .blade-line {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.1;
+      stroke-linejoin: round;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+    }
+
+    body.intro .blade {
+      animation: bladeIn 1.15s cubic-bezier(0.2, 1.2, 0.35, 1) both;
+      animation-delay: calc(0.74s + var(--b) * 0.11s);
+    }
+
+    body.intro .blade-line {
+      animation:
+        lineDraw 0.95s cubic-bezier(0.5, 0, 0.3, 1) both,
+        fadeOut 0.5s 1.95s ease forwards;
+      animation-delay: calc(0.8s + var(--b) * 0.12s), 1.95s;
+    }
+
+    body.intro .blade-fill {
+      animation: fadeIn 0.55s ease both;
+      animation-delay: calc(1.4s + var(--b) * 0.1s);
+    }
+
+    @keyframes bladeIn {
+      0% { opacity: 0; transform: rotate(-150deg) scale(0.3); }
+      30% { opacity: 1; }
+      100% { opacity: 1; transform: none; }
+    }
+
+    @keyframes lineDraw {
+      to { stroke-dashoffset: 0; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes fadeOut {
+      to { opacity: 0; }
+    }
+
+    .hero {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(var(--hy) + var(--S) / 2 + 34px);
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      user-select: none;
+    }
+
+    .hero-title {
+      font-size: clamp(30px, 6.4vh, 60px);
+      font-weight: 800;
+      letter-spacing: -0.045em;
+      line-height: 1.05;
+    }
+
+    .hero-title .w {
+      display: inline-block;
+      overflow: hidden;
+      vertical-align: bottom;
+      padding: 0 0.04em 0.08em;
+      margin: 0 -0.04em -0.08em;
+    }
+
+    .hero-title .w > span {
+      display: inline-block;
+    }
+
+    .hero .step-header-subtitle {
+      margin-top: 10px;
+      font-size: 16px;
+      opacity: 0.82;
+    }
+
+    .hero .btn {
+      margin-top: 28px;
+    }
+
+    body:not(.ready) .hero {
+      visibility: hidden;
+    }
+
+    body.ready:not(.intro-done) .hero-title .w > span {
+      animation: wordUp 0.9s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+      animation-delay: calc(0.1s + var(--i) * 0.09s);
+    }
+
+    body.ready:not(.intro-done) .hero > :not(.hero-title) {
+      animation: riseIn 0.8s var(--ease-out) both;
+    }
+
+    body.ready:not(.intro-done) .hero > :nth-child(2) { animation-delay: 0.5s; }
+    body.ready:not(.intro-done) .hero > :nth-child(3) { animation-delay: 0.68s; }
+
+    .fx > .tools-ring {
+      --tp: 0;
+      width: calc(var(--S) * 1.34);
+      height: calc(var(--S) * 1.34);
+      border-radius: 0;
+      overflow: visible;
+      transform: translate(-50%, -50%) rotate(-90deg) scale(0.92);
+      transition: opacity 0.6s ease, transform 0.8s var(--ease-out);
+    }
+
+    body.loading .fx > .tools-ring {
+      opacity: 1;
+      transform: translate(-50%, -50%) rotate(-90deg);
+    }
+
+    .tools-ring circle {
+      fill: none;
+      stroke-width: 1.4;
+    }
+
+    .tools-ring .track {
+      stroke: var(--hero-faint);
+    }
+
+    .tools-ring .bar {
+      stroke: var(--hero-text);
+      stroke-linecap: round;
+      stroke-dasharray: 100;
+      stroke-dashoffset: calc(100 - var(--tp));
+      transition: stroke-dashoffset 0.6s var(--ease-out), opacity 0.3s ease;
+    }
+
+    body.tools-error .tools-ring .bar {
+      opacity: 0.35;
+    }
+
+    .loader {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(var(--hy) + var(--S) * 0.67 + 30px);
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(14px);
+      pointer-events: none;
+      transition: opacity 0.5s ease, transform 0.7s var(--ease-out);
+    }
+
+    body.loading .loader {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+
+    .loader-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .loader-detail {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 500;
+      max-width: 460px;
+      opacity: 0.85;
+      overflow-wrap: anywhere;
+    }
+
+    .loader-note {
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.65;
+    }
+
+    .loader .btn {
+      margin-top: 10px;
+    }
+
+    @keyframes wordUp {
+      0% { transform: translateY(110%) rotate(6deg); }
+      100% { transform: none; }
+    }
+
+    @keyframes riseIn {
+      0% { opacity: 0; transform: translateY(18px); }
+      100% { opacity: 1; transform: none; }
+    }
+
+    .topbar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: var(--top);
+      padding: 0 220px 0 76px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      opacity: 0;
+      transform: translateY(-12px);
+      pointer-events: none;
+      transition: opacity 0.5s ease, transform 0.7s var(--ease-out);
+    }
+
+    .setup-viewport:not([data-step="1"]) .topbar {
+      opacity: 1;
+      transform: none;
+      transition-delay: 0.35s;
+    }
+
+    .brand-name {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      flex-shrink: 0;
+    }
+
+    .timeline {
+      --p: 0;
+      position: relative;
+      flex: 1;
+      max-width: 560px;
+      margin: 0 auto;
+      height: 34px;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .timeline::before,
+    .tl-fill {
+      content: '';
+      position: absolute;
+      left: 6px;
+      top: 6px;
+      height: 2px;
+      border-radius: 1px;
+    }
+
+    .timeline::before {
+      right: 6px;
+      background-color: var(--hero-soft);
+    }
+
+    .tl-fill {
+      width: calc(var(--p) * (100% - 12px));
+      background-color: var(--hero-text);
+      transition: width 0.9s var(--ease-out);
+    }
+
+    .timeline li {
+      position: relative;
+      z-index: 1;
+      width: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .timeline li::before {
+      content: '';
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      box-sizing: border-box;
+      border: 2px solid var(--hero-soft);
+      background-color: var(--bg-color);
+      transition: border-color 0.3s ease, background-color 0.3s ease, transform 0.45s var(--ease-spring);
+    }
+
+    .timeline li.done::before {
+      border-color: var(--hero-text);
+      background-color: var(--hero-text);
+      transform: scale(0.72);
+    }
+
+    .timeline li.active::before {
+      border-color: var(--hero-text);
+      border-width: 4px;
+      transform: scale(1.25);
+    }
+
+    .timeline li b {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      opacity: 0.5;
+      transition: opacity 0.3s ease;
+    }
+
+    .timeline li.active b,
+    .timeline li.done b {
+      opacity: 1;
+    }
+
+    .scroller {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: var(--top);
+      bottom: var(--foot);
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--hero-soft) transparent;
+      -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+      mask-image: linear-gradient(to bottom, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+    }
+
+    .setup-viewport[data-step="1"] .scroller {
+      pointer-events: none;
+    }
+
+    .content {
+      max-width: 1120px;
+      min-height: 100%;
+      margin: 0 auto;
+      padding: 30px 40px 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .step-pane {
+      transition:
+        opacity 0.38s ease,
+        transform 0.55s var(--ease-out),
+        filter 0.38s ease;
+    }
+
+    .step-pane.anim-out-left,
+    .step-pane.anim-out-right {
+      opacity: 0;
+      filter: blur(6px);
+      pointer-events: none;
+    }
+
+    .content .step-pane > * {
+      transition: transform 0.7s var(--ease-out);
+    }
+
+    .content .step-pane > :nth-child(2) {
+      transition-delay: 0.05s;
+    }
+
+    .content .step-pane.anim-out-left > :nth-child(1) { transform: translateX(-40px); }
+    .content .step-pane.anim-out-left > :nth-child(2) { transform: translateX(-90px); }
+    .content .step-pane.anim-out-right > :nth-child(1) { transform: translateX(40px); }
+    .content .step-pane.anim-out-right > :nth-child(2) { transform: translateX(90px); }
+
+    .hero.anim-out-left { transform: translateY(-26px) scale(0.98); }
+    .hero.anim-out-right { transform: translateY(26px); }
+
+    .pane-head {
+      display: flex;
+      align-items: flex-end;
+      gap: 22px;
+      margin-bottom: 30px;
+    }
+
+    .num {
+      font-size: clamp(64px, 9vw, 124px);
+      font-weight: 800;
+      letter-spacing: -0.06em;
+      line-height: 0.78;
+      color: var(--hero-soft);
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .step-header-title {
+      font-size: clamp(28px, 3.6vw, 44px);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+    }
+
+    .step-header-subtitle {
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.45;
+      margin-top: 8px;
+      opacity: 0.8;
+    }
+
+    .tile {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 20px;
+      border-radius: 26px;
+      background-color: var(--container-fill);
+      color: var(--text-color);
+      transition: background-color 0.4s ease, color 0.4s ease, box-shadow 0.3s ease, transform 0.35s var(--ease-spring);
+    }
+
+    .tile:has(.sw) {
+      cursor: pointer;
+    }
+
+    .tile:has(.sw):hover {
+      background-color: var(--container-fill-hover);
+      transform: translateY(-3px);
+    }
+
+    .tile:has(.sw.on) {
+      box-shadow: inset 0 0 0 2px var(--text-color);
+    }
+
+    .tile-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .row-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 16px;
+      background-color: var(--card-bg);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      transition: background-color 0.3s ease, color 0.3s ease, transform 0.45s var(--ease-spring);
+    }
+
+    .tile:has(.sw.on) .row-icon {
+      background-color: var(--text-color);
+      color: var(--container-fill);
+      transform: rotate(-8deg);
+    }
+
+    .row-icon svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+
+    .row-title {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .row-sub {
+      font-size: 13.5px;
+      font-weight: 500;
+      line-height: 1.45;
+      opacity: 0.7;
+    }
+
+    .tile .btn.small {
+      align-self: flex-start;
+      margin-top: 10px;
+    }
+
+    .sw {
+      position: relative;
+      width: 52px;
+      height: 30px;
+      border-radius: 10px;
+      background-color: var(--slider-track);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background-color 0.25s ease;
+    }
+
+    .sw.on {
+      background-color: var(--text-color);
+    }
+
+    .sw-thumb {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      background-color: var(--container-fill);
+      transition: transform 0.45s var(--ease-spring), width 0.2s ease, background-color 0.25s ease;
+      pointer-events: none;
+    }
+
+    .sw.on .sw-thumb {
+      transform: translateX(22px);
+    }
+
+    .sw:active .sw-thumb {
+      width: 27px;
+    }
+
+    .sw.on:active .sw-thumb {
+      transform: translateX(17px);
+    }
+
+    .sw.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .look {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .themes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .theme-card {
+      position: relative;
+      overflow: hidden;
+      background-color: var(--container-fill);
+      color: var(--text-color);
+      border-radius: 24px;
+      padding: 10px 10px 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      -webkit-app-region: no-drag;
+      transition: background-color 0.3s ease, color 0.3s ease, transform 0.35s var(--ease-spring), box-shadow 0.3s ease;
+    }
+
+    .theme-card:hover {
+      background-color: var(--container-fill-hover);
+      transform: translateY(-3px);
+    }
+
+    .theme-card:active {
+      transform: scale(0.97);
+    }
+
+    .theme-card.active {
+      box-shadow: inset 0 0 0 2px var(--text-color);
+    }
+
+    .theme-card-name {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 6px;
+      font-size: 14px;
+      font-weight: 700;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .radio {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--line-strong);
+      flex-shrink: 0;
+      transition: border-color 0.2s ease, border-width 0.3s var(--ease-spring);
+    }
+
+    .theme-card.active .radio {
+      border-color: var(--text-color);
+      border-width: 5px;
+    }
+
+    .mockup-window {
+      width: 100%;
+      height: clamp(78px, 15vh, 128px);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      pointer-events: none;
+      transition: transform 0.5s var(--ease-out);
+    }
+
+    .theme-card:hover .mockup-window {
+      transform: scale(1.025);
+    }
+
+    .mockup-window.mock-dark {
+      background-color: #141218;
+      --m-surface: #211f26;
+      --m-subtle: #2d2a33;
+      --m-accent: #d0bcff;
+    }
+    .mockup-window.mock-light {
+      background-color: #fbf8fd;
+      --m-surface: #ece5ee;
+      --m-subtle: #ded5e1;
+      --m-accent: #6750a4;
+    }
+    .mockup-window.mock-discord {
+      background-color: #1e1f22;
+      --m-surface: #2b2d31;
+      --m-subtle: #383a40;
+      --m-accent: #5865f2;
+    }
+    .mockup-window.mock-mint {
+      background-color: #caece2;
+      --m-surface: #f2fbf7;
+      --m-subtle: #d3eadf;
+      --m-accent: #176b5f;
+    }
+
+    .mock-topbar {
+      height: 15%;
+      background-color: var(--m-surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mock-search {
+      width: 48%;
+      height: 40%;
+      background-color: var(--m-subtle);
+      border-radius: 3px;
+    }
+
+    .mock-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .mock-sidebar {
+      width: 22%;
+      background-color: var(--m-surface);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px 5px;
+    }
+
+    .mock-item {
+      height: 5px;
+      border-radius: 2px;
+      background-color: var(--m-subtle);
+    }
+    .mock-item.accent {
+      background-color: var(--m-accent);
+      width: 75%;
+    }
+
+    .mock-center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 7px;
+    }
+
+    .mock-banner {
+      height: 34%;
+      border-radius: 4px;
+      background-color: var(--m-subtle);
+    }
+
+    .mock-row {
+      height: 5px;
+      border-radius: 2px;
+      background-color: var(--m-subtle);
+      width: 85%;
+    }
+
+    .mock-right {
+      width: 26%;
+      background-color: var(--m-surface);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 6px;
+    }
+
+    .mock-cover {
+      width: 60%;
+      aspect-ratio: 1;
+      border-radius: 4px;
+      background-color: var(--m-accent);
+    }
+
+    .mock-bottombar {
+      height: 14%;
+      background-color: var(--m-surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mock-controls {
+      width: 30%;
+      height: 32%;
+      border-radius: 3px;
+      background-color: var(--m-accent);
+    }
+
+    .mixer {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      padding: 22px 14px 20px;
+      border-radius: 26px;
+      background-color: var(--container-fill);
+      color: var(--text-color);
+      transition: background-color 0.4s ease, color 0.4s ease;
+    }
+
+    .fader-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .fader-val {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 4px 9px;
+      border-radius: 8px;
+      background-color: var(--card-bg);
+      white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background-color 0.3s ease;
+    }
+
+    .fader-name {
+      font-size: 13.5px;
+      font-weight: 700;
+      text-align: center;
+      line-height: 1.25;
+    }
+
+    .sl {
+      --v: 0.5;
+      --fh: clamp(150px, 30vh, 250px);
+      position: relative;
+      width: 60px;
+      height: var(--fh);
+      -webkit-app-region: no-drag;
+    }
+
+    .sl::after {
+      content: '';
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      top: 13px;
+      bottom: 13px;
+      background-image: linear-gradient(to bottom, var(--line-strong) 0 1px, transparent 1px);
+      background-size: 100% 10%;
+      -webkit-mask-image: linear-gradient(to right, #000 30%, transparent 30% 70%, #000 70%);
+      mask-image: linear-gradient(to right, #000 30%, transparent 30% 70%, #000 70%);
+      pointer-events: none;
+    }
+
+    .sl::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      margin-left: -4px;
+      border-radius: 4px;
+      background-color: var(--slider-track);
+      pointer-events: none;
+      transition: background-color 0.3s ease;
+    }
+
+    .sl-active {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: 8px;
+      margin-left: -4px;
+      height: calc(var(--v) * (100% - 24px) + 12px);
+      border-radius: 4px;
+      background-color: var(--text-color);
+      pointer-events: none;
+      transition: background-color 0.3s ease;
+    }
+
+    .sl input {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: var(--fh);
+      height: 60px;
+      margin: 0;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+      touch-action: none;
+      transform: translate(-50%, -50%) rotate(-90deg);
+    }
+
+    .sl input::-webkit-slider-runnable-track {
+      height: 60px;
+      background: transparent;
+    }
+
+    .sl input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      box-sizing: border-box;
+      width: 24px;
+      height: 46px;
+      margin-top: 7px;
+      border-radius: 9px;
+      background:
+        linear-gradient(to right, transparent calc(50% - 1px), var(--text-color) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+        var(--container-fill);
+      border: 3px solid var(--text-color);
+      cursor: pointer;
+      transition: box-shadow 0.2s ease;
+    }
+
+    .sl input:hover::-webkit-slider-thumb {
+      box-shadow: 0 0 0 6px var(--line);
+    }
+
+    .sl input:active::-webkit-slider-thumb {
+      box-shadow: 0 0 0 9px var(--line);
+    }
+
+    .sl input::-moz-range-track {
+      height: 60px;
+      background: transparent;
+    }
+
+    .sl input::-moz-range-thumb {
+      box-sizing: border-box;
+      width: 24px;
+      height: 46px;
+      border-radius: 9px;
+      background-color: var(--container-fill);
+      border: 3px solid var(--text-color);
+      cursor: pointer;
+    }
+
+    .sl.hue::before {
+      width: 14px;
+      margin-left: -7px;
+      border-radius: 7px;
+      background: linear-gradient(to top, #ff4d4d, #ffa64d, #ffff4d, #4dff4d, #4dffff, #4d4dff, #ff4dff, #ff4d4d);
+    }
+
+    .sl.hue .sl-active {
+      display: none;
+    }
+
+    .sl.hue input::-webkit-slider-thumb {
+      background: linear-gradient(to right, transparent calc(50% - 1px), #211f24 calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)), #ffffff;
+      border-color: #211f24;
+    }
+
+    .sl.hue input::-moz-range-thumb {
+      background-color: #ffffff;
+    }
+
+    .tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .tiles .tile {
+      min-height: 210px;
+    }
+
+    .tiles .tile .row-title {
+      margin-top: auto;
+    }
+
+    .launch {
+      max-width: 720px;
+      gap: 12px;
+      padding: 22px;
+    }
+
+    .launcher-preview {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px;
+      border-radius: 18px;
+      background-color: var(--card-bg);
+      transition: opacity 0.35s ease, filter 0.35s ease;
+    }
+
+    .launch:has(#launcherSwitch:not(.on)) .launcher-preview {
+      opacity: 0.4;
+      filter: grayscale(1);
+    }
+
+    .launcher-tile {
+      width: 56px;
+      height: 56px;
+      border-radius: 17px;
+      background-color: var(--btn-bg);
+      color: var(--btn-text);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .launch:has(#launcherSwitch.on) .launcher-tile {
+      animation: pop 0.6s var(--ease-spring);
+    }
+
+    @keyframes pop {
+      0% { transform: scale(0.6) rotate(-14deg); }
+      100% { transform: none; }
+    }
+
+    .launcher-tile svg {
+      width: 28px;
+      height: 28px;
+      fill: currentColor;
+    }
+
+    .launcher-name {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .launcher-desc {
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.68;
+      margin-top: 1px;
+    }
+
+    .launch-option {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 6px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .launch-option .row-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .connect {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
+      gap: 14px;
+    }
+
+    .connect .tile {
+      min-height: 230px;
+    }
+
+    .connect .discord .row-title {
+      margin-top: auto;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .field {
+      flex: 1;
+      min-width: 0;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-color);
+      background-color: var(--card-bg);
+      border: 2px solid transparent;
+      border-radius: 14px;
+      padding: 11px 14px;
+      outline: none;
+      cursor: text;
+      user-select: text;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .field:hover,
+    .field:focus {
+      background-color: var(--card-bg-hover);
+    }
+
+    .field:focus {
+      border-color: var(--text-color);
+    }
+
+    .field::placeholder {
+      color: var(--text-color);
+      opacity: 0.5;
+    }
+
+    .tile .field-row .btn.small {
+      margin-top: 0;
+      align-self: stretch;
+    }
+
+    .status-line {
+      font-size: 12.5px;
+      font-weight: 600;
+      min-height: 18px;
+      margin-top: 8px;
+      opacity: 0.8;
+    }
+
+    .nav {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--foot);
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      opacity: 0;
+      transform: translateY(16px);
+      pointer-events: none;
+      transition: opacity 0.5s ease, transform 0.7s var(--ease-out);
+    }
+
+    .setup-viewport:not([data-step="1"]) .nav {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+      transition-delay: 0.4s;
+    }
+
+    .setup-viewport[data-step="5"] #nextBtn,
+    .setup-viewport:not([data-step="5"]) #finishBtn {
+      display: none;
+    }
+
+    .btn {
+      position: relative;
+      z-index: 10;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-ui);
+      font-size: 15px;
+      font-weight: 700;
+      padding: 13px 24px;
+      border-radius: 999px;
+      cursor: pointer;
+      overflow: hidden;
+      user-select: none;
+      flex-shrink: 0;
+      transition: background-color 0.25s ease, color 0.25s ease, transform 0.12s ease;
+    }
+
+    .btn:active {
+      transform: scale(0.96);
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
+    .btn.small {
+      font-size: 13px;
+      padding: 9px 16px;
+    }
+
+    .btn.primary {
+      background-color: var(--btn-bg);
+      color: var(--btn-text);
+    }
+    .btn.primary:hover {
+      background-color: var(--btn-bg-hover);
+    }
+
+    .btn.secondary {
+      background-color: var(--btn-secondary-bg);
+      color: var(--text-color);
+    }
+    .btn.secondary:hover {
+      background-color: var(--btn-secondary-hover);
+    }
+
+    .btn.ghost {
+      padding-left: 12px;
+      padding-right: 18px;
+      color: var(--hero-text);
+    }
+    .btn.ghost:hover {
+      background-color: var(--hero-faint);
+    }
+
+    .btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+      pointer-events: none;
+      transition: transform 0.25s var(--ease-spring);
+    }
+
+    .btn.go {
+      padding: 7px 7px 7px 24px;
+      gap: 14px;
+      font-size: 15.5px;
+    }
+
+    .btn.go svg {
+      width: 36px;
+      height: 36px;
+      padding: 9px;
+      border-radius: 50%;
+      background-color: var(--btn-text);
+      fill: var(--btn-bg);
+      transition: transform 0.35s var(--ease-spring), background-color 0.25s ease, fill 0.25s ease;
+    }
+
+    .btn:hover svg.arrow-right {
+      transform: translateX(4px);
+    }
+    .btn.go:hover svg.arrow-right {
+      transform: rotate(-45deg);
+    }
+    .btn:hover svg.arrow-left {
+      transform: translateX(-4px);
+    }
+
+    .ripple-wave {
+      position: absolute;
+      border-radius: 50%;
+      background-color: var(--ripple-color);
+      transform: scale(0);
+      pointer-events: none !important;
+      animation: rippleAnim 0.6s cubic-bezier(0.1, 0.4, 0.2, 1) forwards;
+      filter: blur(4px);
+    }
+
+    @keyframes rippleAnim {
+      to { transform: scale(3.5); opacity: 0; }
+    }
+
+    @media (max-width: 980px) {
+      .look,
+      .connect {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .sl {
+        --fh: 170px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      :root {
+        --top: 112px;
+        --foot: 76px;
+      }
+
+      .topbar {
+        flex-wrap: wrap;
+        align-content: flex-start;
+        padding: 20px 20px 0 70px;
+        row-gap: 18px;
+      }
+
+      .brand-name {
+        line-height: 40px;
+      }
+
+      .setup-viewport:not([data-step="1"]) .mark {
+        top: 20px;
+      }
+
+      .tiles .tile,
+      .connect .tile {
+        min-height: 0;
+      }
+
+      .timeline {
+        flex-basis: calc(100% + 50px);
+        margin-left: -50px;
+        max-width: none;
+      }
+
+      .content {
+        padding: 22px 18px 28px;
+      }
+
+      .pane-head {
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+
+      .num {
+        font-size: 58px;
+      }
+
+      .nav {
+        padding: 0 16px;
+      }
+    }
+
+    @media (max-width: 460px) {
+      .num {
+        display: none;
+      }
+
+      .themes-grid {
+        gap: 10px;
+      }
+
+      .fader-name {
+        font-size: 12px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-delay: 0s !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+
+      .wave,
+      .ambient {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="win-controls" id="winControls">
+    <button class="btn small secondary" id="skipBtn">Skip</button>
+    <button class="btn secondary win-icon" id="winMinBtn" title="Minimize">
+      <svg viewBox="0 0 24 24"><path d="M6 19h12v2H6z"/></svg>
+    </button>
+    <button class="btn secondary win-icon" id="winCloseBtn" title="Close">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+
+  <div class="setup-viewport" id="setupViewport" data-step="1">
+
+    <div class="ambient" aria-hidden="true"><span></span><span></span><span></span></div>
+
+    <div class="fx" aria-hidden="true">
+      <i class="glow"></i>
+      <i class="splash"></i><i class="splash"></i><i class="splash"></i><i class="splash"></i>
+      <i class="wave"></i><i class="wave"></i><i class="wave"></i><i class="wave"></i>
+      <i class="spark" style="--a:-90deg;--d:70px"></i>
+      <i class="spark" style="--a:-45deg;--d:92px"></i>
+      <i class="spark" style="--a:0deg;--d:64px"></i>
+      <i class="spark" style="--a:45deg;--d:88px"></i>
+      <i class="spark" style="--a:90deg;--d:58px"></i>
+      <i class="spark" style="--a:135deg;--d:94px"></i>
+      <i class="spark" style="--a:180deg;--d:68px"></i>
+      <i class="spark" style="--a:225deg;--d:84px"></i>
+      <i class="drop"></i>
+      <svg class="tools-ring" viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="48"/><circle class="bar" cx="50" cy="50" r="48" pathLength="100"/></svg>
+    </div>
+
+    <div class="mark" aria-hidden="true">
+      <div class="mark-turn">
+        <div class="mark-idle">
+          <svg viewBox="0 0 100 100">
+            <defs>
+              <path id="bladeA" pathLength="1" d="M51.26 10.99C50.05 11.08 48.21 11.19 46.51 11.5C44.8 11.82 42.73 12.32 41.02 12.87C39.32 13.43 37.74 14.11 36.27 14.81C34.79 15.52 33.26 16.46 32.18 17.11C31.1 17.76 30.6 18.13 29.81 18.72C29.02 19.31 28.07 20.12 27.43 20.65C26.8 21.19 26.65 21.28 26 21.93C25.35 22.58 24.21 23.78 23.52 24.56C22.84 25.34 22.39 25.92 21.89 26.6C21.4 27.28 20.9 28.05 20.57 28.63C20.25 29.21 20.05 29.68 19.96 30.09C19.87 30.5 19.96 30.84 20.02 31.09C20.09 31.34 20.21 31.44 20.34 31.57C20.48 31.7 20.49 31.81 20.84 31.87C21.19 31.93 20.75 32.39 22.43 31.92C24.1 31.45 29.13 29.61 30.89 29.05C32.64 28.5 32.12 28.72 32.95 28.57C33.79 28.42 35.03 28.23 35.89 28.16C36.75 28.09 37.36 28.11 38.12 28.15C38.87 28.19 39.49 28.21 40.41 28.41C41.33 28.6 42.7 28.99 43.64 29.33C44.57 29.67 45.26 30.02 46.01 30.46C46.77 30.9 47.63 31.53 48.18 31.96C48.74 32.39 48.89 32.5 49.36 33.01C49.83 33.53 50.44 34.17 50.99 35.05C51.55 35.93 52.16 36.7 52.69 38.3C53.23 39.89 53.75 43.2 54.19 44.61C54.64 46.03 55 46.22 55.37 46.78C55.74 47.35 55.87 47.55 56.39 48C56.9 48.44 57.71 49.07 58.45 49.44C59.2 49.82 59.98 50.09 60.85 50.24C61.71 50.38 62.69 50.41 63.63 50.31C64.56 50.21 65.74 49.84 66.45 49.62C67.15 49.39 67.31 49.27 67.86 48.96C68.41 48.66 69.24 48.13 69.73 47.8C70.22 47.47 70.33 47.41 70.81 46.97C71.3 46.53 72.04 45.86 72.65 45.14C73.25 44.41 73.9 43.54 74.45 42.63C74.99 41.71 75.53 40.68 75.93 39.65C76.34 38.62 76.64 37.56 76.86 36.43C77.08 35.29 77.26 34.07 77.26 32.85C77.26 31.64 77.1 30.36 76.86 29.12C76.61 27.89 76.25 26.62 75.78 25.42C75.3 24.22 74.72 23.1 73.99 21.95C73.25 20.79 72.06 19.33 71.37 18.5C70.68 17.67 70.71 17.67 69.86 16.99C69 16.3 67.43 15.08 66.25 14.37C65.07 13.66 63.92 13.19 62.78 12.74C61.63 12.29 60.89 11.97 59.38 11.67C57.88 11.37 55.09 11.05 53.74 10.93C52.38 10.82 52.46 10.89 51.26 10.99Z"/>
+              <path id="bladeB" pathLength="1" d="M80.79 29.2C80.6 29.29 80.32 29.47 80.19 29.71C80.05 29.95 79.94 29.59 79.98 30.62C80.03 31.65 80.41 34.4 80.46 35.89C80.51 37.37 80.42 38.37 80.29 39.54C80.17 40.72 79.96 41.9 79.72 42.96C79.47 44.01 79.15 45.02 78.83 45.9C78.52 46.78 78.38 47.25 77.83 48.25C77.28 49.24 76.38 50.78 75.55 51.87C74.73 52.96 73.57 54.11 72.89 54.78C72.21 55.46 72.09 55.48 71.47 55.92C70.84 56.36 70.02 56.94 69.14 57.42C68.26 57.89 67.01 58.45 66.19 58.77C65.36 59.09 65.05 59.17 64.19 59.33C63.34 59.49 62.07 59.71 61.08 59.73C60.1 59.75 59.05 59.58 58.31 59.47C57.57 59.36 57.96 59.55 56.65 59.06C55.34 58.56 51.79 56.96 50.45 56.49C49.12 56.01 49.38 56.25 48.64 56.22C47.91 56.19 46.8 56.21 46.03 56.32C45.26 56.42 44.66 56.62 44.02 56.86C43.38 57.1 42.71 57.46 42.2 57.75C41.7 58.05 41.45 58.2 40.99 58.61C40.53 59.03 39.88 59.65 39.44 60.25C39 60.85 38.62 61.5 38.36 62.2C38.1 62.9 37.95 63.74 37.89 64.44C37.82 65.14 37.86 65.73 37.98 66.41C38.09 67.09 38.24 67.74 38.56 68.54C38.88 69.33 39.37 70.34 39.89 71.19C40.41 72.05 41.12 72.96 41.71 73.68C42.29 74.4 42.6 74.81 43.38 75.52C44.16 76.23 45.51 77.32 46.38 77.95C47.24 78.57 47.86 78.88 48.56 79.27C49.27 79.65 49.99 79.97 50.62 80.24C51.25 80.51 51.49 80.65 52.35 80.91C53.2 81.17 54.25 81.56 55.76 81.8C57.27 82.05 59.53 82.38 61.4 82.38C63.28 82.37 65.51 82.02 67.02 81.77C68.53 81.53 69.57 81.16 70.46 80.91C71.35 80.65 71.34 80.67 72.35 80.24C73.35 79.81 75.56 78.77 76.48 78.31C77.4 77.85 77.32 77.82 77.87 77.47C78.41 77.11 79 76.76 79.76 76.17C80.53 75.58 81.7 74.63 82.46 73.92C83.21 73.22 83.66 72.68 84.29 71.93C84.92 71.18 85.58 70.4 86.24 69.41C86.9 68.43 87.7 67.1 88.25 66C88.8 64.91 89.19 63.86 89.55 62.84C89.91 61.82 90.14 61.24 90.4 59.86C90.67 58.48 91.02 55.99 91.15 54.55C91.27 53.1 91.2 52.24 91.15 51.2C91.1 50.16 90.98 49.24 90.86 48.3C90.73 47.36 90.65 46.69 90.4 45.56C90.15 44.43 89.7 42.63 89.36 41.5C89.02 40.38 88.76 39.74 88.37 38.82C87.99 37.9 87.53 36.88 87.06 35.98C86.6 35.09 86.14 34.3 85.6 33.46C85.06 32.62 84.4 31.63 83.81 30.94C83.22 30.26 82.47 29.65 82.06 29.35C81.64 29.04 81.52 29.16 81.31 29.13C81.1 29.11 80.98 29.1 80.79 29.2Z"/>
+              <path id="bladeC" pathLength="1" d="M28.29 34.27C27.57 34.34 26.31 34.47 25.46 34.63C24.6 34.78 23.89 34.98 23.16 35.2C22.43 35.43 21.84 35.64 21.08 35.99C20.32 36.35 19.45 36.78 18.6 37.34C17.74 37.89 16.56 38.81 15.95 39.31C15.33 39.82 15.36 39.84 14.91 40.35C14.47 40.86 13.75 41.74 13.28 42.39C12.82 43.04 12.57 43.38 12.12 44.26C11.68 45.14 10.98 46.67 10.61 47.69C10.24 48.7 10.09 49.41 9.91 50.34C9.72 51.27 9.56 52.3 9.49 53.27C9.42 54.24 9.43 55.16 9.5 56.13C9.56 57.1 9.67 58.01 9.89 59.09C10.11 60.18 10.51 61.68 10.8 62.64C11.09 63.6 11.22 63.93 11.63 64.85C12.03 65.77 12.72 67.21 13.24 68.18C13.75 69.16 14.07 69.69 14.72 70.69C15.37 71.69 16.3 73.07 17.13 74.18C17.96 75.29 18.62 76.17 19.7 77.35C20.78 78.53 22.14 79.99 23.6 81.26C25.07 82.53 27.29 84.12 28.5 84.98C29.7 85.85 29.92 85.93 30.86 86.44C31.8 86.96 33.13 87.63 34.16 88.09C35.18 88.55 36.05 88.88 37.02 89.22C37.99 89.55 38.71 89.82 39.98 90.09C41.25 90.35 43.35 90.71 44.66 90.83C45.97 90.95 47.01 90.86 47.84 90.82C48.67 90.78 49.11 90.68 49.65 90.56C50.2 90.45 50.66 90.32 51.13 90.13C51.61 89.94 52.12 89.71 52.49 89.41C52.86 89.12 53.2 88.74 53.36 88.37C53.52 87.99 53.52 87.53 53.44 87.15C53.36 86.78 53.15 86.43 52.87 86.12C52.59 85.82 52.19 85.55 51.77 85.31C51.35 85.06 51.46 85.04 50.35 84.65C49.25 84.27 46.67 83.56 45.14 83.01C43.61 82.47 42.32 81.95 41.17 81.39C40.03 80.84 39.1 80.25 38.24 79.7C37.39 79.15 36.72 78.62 36.04 78.07C35.37 77.52 34.92 77.23 34.21 76.4C33.5 75.57 32.44 74.18 31.77 73.09C31.11 72 30.61 70.85 30.24 69.84C29.87 68.83 29.68 68.04 29.54 67.03C29.41 66.02 29.42 64.5 29.43 63.8C29.43 63.09 29.44 63.3 29.55 62.8C29.66 62.31 29.82 61.53 30.11 60.81C30.4 60.09 30.93 59.11 31.3 58.49C31.66 57.87 31.72 57.72 32.3 57.1C32.87 56.48 34.09 55.33 34.75 54.77C35.42 54.21 35.29 54.27 36.28 53.75C37.28 53.23 39.74 52.15 40.71 51.63C41.68 51.11 41.67 51.03 42.11 50.64C42.54 50.25 42.96 49.8 43.32 49.3C43.67 48.8 44.01 48.16 44.23 47.66C44.45 47.16 44.56 46.84 44.64 46.31C44.72 45.79 44.8 45.17 44.73 44.51C44.66 43.84 44.41 42.91 44.21 42.31C44.02 41.71 43.8 41.34 43.54 40.91C43.28 40.48 43.14 40.22 42.66 39.71C42.19 39.2 41.41 38.42 40.69 37.86C39.97 37.31 39.14 36.8 38.34 36.38C37.54 35.96 36.71 35.61 35.89 35.33C35.06 35.04 34.38 34.84 33.37 34.65C32.36 34.47 30.66 34.28 29.82 34.22C28.97 34.16 29.02 34.2 28.29 34.27Z"/>
+            </defs>
+            <g class="blade" style="--b:0"><use class="blade-fill" href="#bladeA"/><use class="blade-line" href="#bladeA"/></g>
+            <g class="blade" style="--b:1"><use class="blade-fill" href="#bladeB"/><use class="blade-line" href="#bladeB"/></g>
+            <g class="blade" style="--b:2"><use class="blade-fill" href="#bladeC"/><use class="blade-line" href="#bladeC"/></g>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <header class="topbar">
+      <span class="brand-name">Ripple</span>
+      <ol class="timeline" id="timeline" aria-hidden="true">
+        <i class="tl-fill"></i>
+        <li><b>01</b></li>
+        <li><b>02</b></li>
+        <li><b>03</b></li>
+        <li><b>04</b></li>
+        <li><b>05</b></li>
+      </ol>
+    </header>
+
+    <section class="step-pane hero" id="step1">
+      <h2 class="step-header-title hero-title"><span class="w"><span style="--i:0">Welcome</span></span> <span class="w"><span style="--i:1">to</span></span> <span class="w"><span style="--i:2">Ripple.</span></span></h2>
+      <p class="step-header-subtitle">Let's get started.</p>
+      <button class="btn primary go" data-nav="next">
+        <span>Continue</span>
+        <svg class="arrow-right" viewBox="0 0 24 24">
+          <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42L16.86 11H5v2z"/>
+        </svg>
+      </button>
+    </section>
+
+    <div class="loader" id="toolsLoader" aria-live="polite">
+      <div class="loader-title" id="toolsTitle">Getting Ripple ready</div>
+      <div class="loader-detail" id="toolsDetail">Checking tools...</div>
+      <div class="loader-note">yt-dlp and ffmpeg let Ripple play and save tracks.</div>
+      <button class="btn small primary is-hidden" id="toolsRetry">Retry</button>
+    </div>
+
+    <main class="scroller" id="stage">
+      <div class="content">
+
+        <section class="step-pane is-hidden" id="step2">
+          <header class="pane-head">
+            <span class="num" aria-hidden="true">02</span>
+            <div>
+              <h2 class="step-header-title">Choose your look</h2>
+              <p class="step-header-subtitle">Select a preset or fine-tune color and intensity to your liking.</p>
+            </div>
+          </header>
+
+          <div class="look">
+            <div class="themes-grid">
+              <div class="theme-card" data-preset="dark">
+                <div class="mockup-window mock-dark">
+                  <div class="mock-topbar"><div class="mock-search"></div></div>
+                  <div class="mock-body">
+                    <div class="mock-sidebar"><div class="mock-item accent"></div><div class="mock-item"></div><div class="mock-item"></div></div>
+                    <div class="mock-center"><div class="mock-banner"></div><div class="mock-row"></div><div class="mock-row"></div></div>
+                    <div class="mock-right"><div class="mock-cover"></div></div>
+                  </div>
+                  <div class="mock-bottombar"><div class="mock-controls"></div></div>
+                </div>
+                <span class="theme-card-name"><span class="radio"></span>Dark</span>
+              </div>
+
+              <div class="theme-card" data-preset="light">
+                <div class="mockup-window mock-light">
+                  <div class="mock-topbar"><div class="mock-search"></div></div>
+                  <div class="mock-body">
+                    <div class="mock-sidebar"><div class="mock-item accent"></div><div class="mock-item"></div><div class="mock-item"></div></div>
+                    <div class="mock-center"><div class="mock-banner"></div><div class="mock-row"></div><div class="mock-row"></div></div>
+                    <div class="mock-right"><div class="mock-cover"></div></div>
+                  </div>
+                  <div class="mock-bottombar"><div class="mock-controls"></div></div>
+                </div>
+                <span class="theme-card-name"><span class="radio"></span>Light</span>
+              </div>
+
+              <div class="theme-card" data-preset="discord">
+                <div class="mockup-window mock-discord">
+                  <div class="mock-topbar"><div class="mock-search"></div></div>
+                  <div class="mock-body">
+                    <div class="mock-sidebar"><div class="mock-item accent"></div><div class="mock-item"></div><div class="mock-item"></div></div>
+                    <div class="mock-center"><div class="mock-banner"></div><div class="mock-row"></div><div class="mock-row"></div></div>
+                    <div class="mock-right"><div class="mock-cover"></div></div>
+                  </div>
+                  <div class="mock-bottombar"><div class="mock-controls"></div></div>
+                </div>
+                <span class="theme-card-name"><span class="radio"></span>Discord</span>
+              </div>
+
+              <div class="theme-card active" data-preset="mint">
+                <div class="mockup-window mock-mint">
+                  <div class="mock-topbar"><div class="mock-search"></div></div>
+                  <div class="mock-body">
+                    <div class="mock-sidebar"><div class="mock-item accent"></div><div class="mock-item"></div><div class="mock-item"></div></div>
+                    <div class="mock-center"><div class="mock-banner"></div><div class="mock-row"></div><div class="mock-row"></div></div>
+                    <div class="mock-right"><div class="mock-cover"></div></div>
+                  </div>
+                  <div class="mock-bottombar"><div class="mock-controls"></div></div>
+                </div>
+                <span class="theme-card-name"><span class="radio"></span>Mint</span>
+              </div>
+            </div>
+
+            <div class="mixer">
+              <div class="fader-col">
+                <span class="fader-val" id="hueVal">Cyan (162°)</span>
+                <div class="sl hue">
+                  <div class="sl-active"></div>
+                  <input type="range" id="hueSlider" min="0" max="360" value="162" aria-label="Color Accent">
+                </div>
+                <span class="fader-name">Color Accent</span>
+              </div>
+
+              <div class="fader-col">
+                <span class="fader-val" id="brightnessVal">86%</span>
+                <div class="sl">
+                  <div class="sl-active"></div>
+                  <input type="range" id="brightnessSlider" min="12" max="96" value="86" aria-label="Theme Brightness">
+                </div>
+                <span class="fader-name">Theme Brightness</span>
+              </div>
+
+              <div class="fader-col">
+                <span class="fader-val" id="satVal">48%</span>
+                <div class="sl">
+                  <div class="sl-active"></div>
+                  <input type="range" id="satSlider" min="0" max="100" value="48" aria-label="Color Intensity">
+                </div>
+                <span class="fader-name">Color Intensity</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="step-pane is-hidden" id="step3">
+          <header class="pane-head">
+            <span class="num" aria-hidden="true">03</span>
+            <div>
+              <h2 class="step-header-title">Make it yours</h2>
+              <p class="step-header-subtitle">Everything here can be changed later in Settings.</p>
+            </div>
+          </header>
+
+          <div class="tiles">
+            <div class="tile">
+              <div class="tile-top">
+                <div class="row-icon">
+                  <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                </div>
+                <button class="sw on" role="switch" aria-checked="true" aria-label="Local library" data-key="ripple_show_local"></button>
+              </div>
+              <div class="row-title">Local library</div>
+              <div class="row-sub">Show the My files tab for music stored on your computer</div>
+            </div>
+
+            <div class="tile">
+              <div class="tile-top">
+                <div class="row-icon">
+                  <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                </div>
+                <button class="sw" role="switch" aria-checked="false" aria-label="Custom background" data-key="ripple_custom_bg_enabled"></button>
+              </div>
+              <div class="row-title">Custom background</div>
+              <div class="row-sub" id="bgSub">Use your own image or video behind the app</div>
+              <button class="btn small secondary is-hidden" id="bgPickBtn">Choose file</button>
+            </div>
+
+            <div class="tile">
+              <div class="tile-top">
+                <div class="row-icon">
+                  <svg viewBox="0 0 24 24"><path d="M21 3L3 10.53v.98l6.84 2.65L12.49 21h.98L21 3z"/></svg>
+                </div>
+                <button class="sw" role="switch" aria-checked="false" aria-label="No-Hand cursor" data-key="ripple_no_hand_cursor"></button>
+              </div>
+              <div class="row-title">No-Hand cursor</div>
+              <div class="row-sub">Keep the normal arrow instead of the hand on buttons</div>
+            </div>
+
+            <div class="tile">
+              <div class="tile-top">
+                <div class="row-icon">
+                  <svg viewBox="0 0 24 24"><path d="M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.44zm-9.79 6.84a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z"/></svg>
+                </div>
+                <button class="sw" role="switch" aria-checked="false" aria-label="Performance mode" data-key="ripple_perf_mode"></button>
+              </div>
+              <div class="row-title">Performance mode</div>
+              <div class="row-sub">Turn off blur and heavy animations on slower computers</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="step-pane is-hidden" id="step4">
+          <header class="pane-head">
+            <span class="num" aria-hidden="true">04</span>
+            <div>
+              <h2 class="step-header-title">Add Ripple to your launcher</h2>
+              <p class="step-header-subtitle" id="launcherSub">Open Ripple in one click from your Start menu or applications menu.</p>
+            </div>
+          </header>
+
+          <div class="tile launch">
+            <div class="launcher-preview">
+              <div class="launcher-tile">
+                <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+              </div>
+              <div>
+                <div class="launcher-name">Ripple</div>
+                <div class="launcher-desc">Music player</div>
+              </div>
+            </div>
+            <div class="launch-option">
+              <div class="row-icon">
+                <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+              </div>
+              <div class="row-text">
+                <div class="row-title" id="launcherTitle">Start menu shortcut</div>
+                <div class="row-sub" id="launcherRowSub">Add Ripple with its icon so you can find it by searching</div>
+              </div>
+              <button class="sw on" role="switch" aria-checked="true" aria-label="Launcher shortcut" id="launcherSwitch"></button>
+            </div>
+          </div>
+        </section>
+
+        <section class="step-pane is-hidden" id="step5">
+          <header class="pane-head">
+            <span class="num" aria-hidden="true">05</span>
+            <div>
+              <h2 class="step-header-title">Connect your world</h2>
+              <p class="step-header-subtitle">Optional. You can skip this and set it up whenever you like.</p>
+            </div>
+          </header>
+
+          <div class="connect">
+            <div class="tile discord">
+              <div class="tile-top">
+                <div class="row-icon">
+                  <svg viewBox="0 0 24 24"><path d="M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z"/></svg>
+                </div>
+                <button class="sw" role="switch" aria-checked="false" aria-label="Discord Rich Presence" id="discordSwitch"></button>
+              </div>
+              <div class="row-title">Discord Rich Presence</div>
+              <div class="row-sub" id="discordSub">Show what you're listening to on your Discord profile</div>
+            </div>
+
+            <div class="tile spotify">
+              <div class="tile-top">
+                <div class="row-icon">
+                  <svg viewBox="0 0 24 24"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
+                </div>
+              </div>
+              <div class="row-title">Import a Spotify playlist</div>
+              <div class="row-sub">Paste a public playlist link and it becomes a Ripple playlist</div>
+              <div class="field-row">
+                <input class="field" id="spotifyUrl" type="text" placeholder="https://open.spotify.com/playlist/..." spellcheck="false" autocomplete="off">
+                <button class="btn small primary" id="spotifyImportBtn">Import</button>
+              </div>
+              <div class="status-line" id="spotifyStatus"></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <footer class="nav">
+      <button class="btn ghost" data-nav="back">
+        <svg class="arrow-left" viewBox="0 0 24 24">
+          <path d="M19 11H7.14l5.43-5.43L11.14 4.14 2.86 12.43l8.29 8.29 1.42-1.42L7.14 13H19v-2z"/>
+        </svg>
+        <span>Back</span>
+      </button>
+      <button class="btn primary go" id="nextBtn" data-nav="next">
+        <span>Continue</span>
+        <svg class="arrow-right" viewBox="0 0 24 24">
+          <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42L16.86 11H5v2z"/>
+        </svg>
+      </button>
+      <button class="btn primary go" id="finishBtn">
+        <span id="finishBtnText">Let's go</span>
+        <svg class="arrow-right" id="finishBtnIcon" viewBox="0 0 24 24">
+          <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42L16.86 11H5v2z"/>
+        </svg>
+      </button>
+    </footer>
+
+  </div>
+
+  <script>
+    const bridge = {
+      api: window.electronAPI || null,
+
+      get(key, fallback) {
+        try {
+          const v = localStorage.getItem(key);
+          return v === null ? fallback : v;
+        } catch (e) {
+          return fallback;
+        }
+      },
+
+      set(key, value) {
+        try {
+          localStorage.setItem(key, String(value));
+        } catch (e) {}
+      },
+
+      async serverPort() {
+        if (this.api && this.api.getServerPort) {
+          try {
+            return await this.api.getServerPort();
+          } catch (e) {}
+        }
+        return null;
+      },
+
+      async pickMedia() {
+        if (this.api && this.api.pickMedia) {
+          try {
+            return (await this.api.pickMedia()) || null;
+          } catch (e) {
+            return null;
+          }
+        }
+        return new Promise((resolve) => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*,video/*';
+          input.onchange = () => resolve(input.files[0] ? URL.createObjectURL(input.files[0]) + '#' + encodeURIComponent(input.files[0].name) : null);
+          input.click();
+        });
+      },
+
+      finish(detail) {
+        if (this.api && this.api.welcomeFinish) this.api.welcomeFinish(detail);
+      },
+
+      async launcherInfo() {
+        if (this.api && this.api.getLauncherInfo) {
+          try {
+            return await this.api.getLauncherInfo();
+          } catch (e) {}
+        }
+        return null;
+      },
+
+      discordSetEnabled(on) {
+        if (this.api && this.api.discordRpcSetEnabled) this.api.discordRpcSetEnabled(on);
+      },
+
+      async discordConnected() {
+        if (this.api && this.api.discordRpcGetConnected) {
+          try {
+            return !!(await this.api.discordRpcGetConnected());
+          } catch (e) {}
+        }
+        return false;
+      },
+
+      async spotifyLookup(url) {
+        const port = await this.serverPort();
+        if (!port) return { success: false, error: 'Ripple server is not available here' };
+        try {
+          const res = await fetch(`http://127.0.0.1:${port}/api/spotify-import?url=${encodeURIComponent(url)}`, {
+            headers: { 'X-Ripple-Token': this.api?.serverToken || '' }
+          });
+          return await res.json();
+        } catch (e) {
+          return { success: false, error: 'Could not reach the Ripple server' };
+        }
+      }
+    };
+
+    const viewport = document.getElementById('setupViewport');
+    const stage = document.getElementById('stage');
+    const timeline = document.getElementById('timeline');
+    const TOTAL_STEPS = 5;
+    let current = 1;
+    let busy = false;
+
+    function triggerRipple(e, el) {
+      const rect = el.getBoundingClientRect();
+      const circle = document.createElement('span');
+      const diameter = Math.max(rect.width, rect.height);
+      const radius = diameter / 2;
+
+      let clientX = e.clientX;
+      let clientY = e.clientY;
+
+      if (!clientX && !clientY) {
+        clientX = rect.left + radius;
+        clientY = rect.top + radius;
+      }
+
+      circle.style.width = circle.style.height = `${diameter}px`;
+      circle.style.left = `${clientX - rect.left - radius}px`;
+      circle.style.top = `${clientY - rect.top - radius}px`;
+      circle.classList.add('ripple-wave');
+
+      const oldRipple = el.querySelector('.ripple-wave');
+      if (oldRipple) oldRipple.remove();
+
+      el.appendChild(circle);
+      circle.addEventListener('animationend', () => circle.remove());
+    }
+
+    document.querySelectorAll('.btn, .theme-card').forEach((item) => {
+      item.addEventListener('click', (e) => triggerRipple(e, item));
+    });
+
+    function updateDots() {
+      timeline.style.setProperty('--p', (current - 1) / (TOTAL_STEPS - 1));
+      timeline.querySelectorAll('li').forEach((node, i) => {
+        node.classList.toggle('active', i + 1 === current);
+        node.classList.toggle('done', i + 1 < current);
+      });
+    }
+
+    function go(to) {
+      if (busy || to === current || to < 1 || to > TOTAL_STEPS) return;
+      busy = true;
+
+      const forward = to > current;
+      const swap = current === 1 || to === 1 ? 380 : 200;
+      if (current === 1) document.body.classList.add('intro-done');
+      const from = document.getElementById('step' + current);
+      const next = document.getElementById('step' + to);
+
+      from.classList.add(forward ? 'anim-out-left' : 'anim-out-right');
+      viewport.dataset.step = to;
+
+      setTimeout(() => {
+        from.classList.add('is-hidden');
+        from.classList.remove('anim-out-left', 'anim-out-right');
+
+        next.classList.remove('is-hidden');
+        next.classList.add(forward ? 'anim-out-right' : 'anim-out-left');
+        void next.offsetWidth;
+        next.classList.remove('anim-out-left', 'anim-out-right');
+
+        current = to;
+        updateDots();
+        stage.scrollTop = 0;
+        setTimeout(() => { busy = false; }, 250);
+      }, swap);
+    }
+
+    document.querySelectorAll('[data-nav]').forEach((btn) => {
+      btn.addEventListener('click', () => go(current + (btn.dataset.nav === 'next' ? 1 : -1)));
+    });
+
+    updateDots();
+
+    const hueSlider = document.getElementById('hueSlider');
+    const brightnessSlider = document.getElementById('brightnessSlider');
+    const satSlider = document.getElementById('satSlider');
+
+    const hueVal = document.getElementById('hueVal');
+    const brightnessVal = document.getElementById('brightnessVal');
+    const satVal = document.getElementById('satVal');
+    const themeCards = document.querySelectorAll('.theme-card');
+
+    const themeState = { preset: 'mint', h: 162, b: 86, s: 48 };
+
+    function syncSlider(input) {
+      const v = (input.value - input.min) / (input.max - input.min);
+      input.closest('.sl').style.setProperty('--v', v);
+    }
+
+    function hueName(h) {
+      if (h < 25 || h >= 335) return 'Red';
+      if (h < 65) return 'Amber';
+      if (h < 150) return 'Green';
+      if (h < 200) return 'Cyan';
+      if (h < 250) return 'Blue';
+      if (h < 290) return 'Purple';
+      return 'Pink';
+    }
+
+    function syncLabels(h, b, s) {
+      brightnessVal.textContent = `${b}%`;
+      satVal.textContent = `${s}%`;
+      hueVal.textContent = `${hueName(h)} (${h}°)`;
+    }
+
+    function applyDynamicColors() {
+      const h = parseInt(hueSlider.value, 10);
+      const b = parseInt(brightnessSlider.value, 10);
+      const s = parseInt(satSlider.value, 10);
+
+      themeState.preset = 'custom';
+      themeState.h = h;
+      themeState.b = b;
+      themeState.s = s;
+
+      syncLabels(h, b, s);
+
+      const bg = `hsl(${h}, ${s}%, ${b}%)`;
+      const isDark = b < 50;
+
+      const contL = isDark ? Math.min(80, b + 14) : Math.max(20, b - 14);
+      const contS = Math.max(12, Math.round(s * 0.4));
+      const containerFill = `hsl(${h}, ${contS}%, ${contL}%)`;
+      const containerFillHover = isDark
+        ? `hsl(${h}, ${contS}%, ${contL + 5}%)`
+        : `hsl(${h}, ${contS}%, ${contL + 4}%)`;
+
+      const cardL = isDark ? Math.min(85, contL + 6) : Math.max(15, contL - 6);
+      const cardBg = `hsl(${h}, ${contS}%, ${cardL}%)`;
+      const cardBgHover = `hsl(${h}, ${contS}%, ${isDark ? cardL + 5 : cardL - 4}%)`;
+
+      const sliderTrack = `hsl(${h}, ${contS}%, ${isDark ? contL + 12 : contL - 10}%)`;
+
+      const textColor = isDark ? '#f4effa' : '#211f24';
+      const heroText = isDark ? `hsl(${h}, ${Math.min(95, s)}%, 84%)` : '#ffffff';
+      const btnBg = isDark ? `hsl(${h}, ${s}%, 84%)` : '#ffffff';
+      const btnText = '#211f24';
+      const btnBgHover = isDark ? '#ffffff' : `hsl(${h}, 25%, 96%)`;
+
+      const secondaryBg = `hsl(${h}, ${contS}%, ${isDark ? contL + 10 : contL - 8}%)`;
+      const secondaryHover = `hsl(${h}, ${contS}%, ${isDark ? contL + 16 : contL - 12}%)`;
+      const rippleColor = isDark ? 'rgba(28, 25, 33, 0.28)' : 'rgba(33, 31, 36, 0.22)';
+
+      const rootStyle = document.body.style;
+      rootStyle.removeProperty('--mark');
+      rootStyle.setProperty('--bg-color', bg);
+      rootStyle.setProperty('--container-fill', containerFill);
+      rootStyle.setProperty('--container-fill-hover', containerFillHover);
+      rootStyle.setProperty('--card-bg', cardBg);
+      rootStyle.setProperty('--card-bg-hover', cardBgHover);
+      rootStyle.setProperty('--slider-track', sliderTrack);
+      rootStyle.setProperty('--text-color', textColor);
+      rootStyle.setProperty('--hero-text', heroText);
+      rootStyle.setProperty('--btn-bg', btnBg);
+      rootStyle.setProperty('--btn-text', btnText);
+      rootStyle.setProperty('--btn-bg-hover', btnBgHover);
+      rootStyle.setProperty('--btn-secondary-bg', secondaryBg);
+      rootStyle.setProperty('--btn-secondary-hover', secondaryHover);
+      rootStyle.setProperty('--ripple-color', rippleColor);
+    }
+
+    [hueSlider, brightnessSlider, satSlider].forEach((slider) => {
+      slider.addEventListener('input', () => {
+        themeCards.forEach((c) => c.classList.remove('active'));
+        syncSlider(slider);
+        applyDynamicColors();
+      });
+    });
+
+    const presets = {
+      'dark': {
+        h: 265, b: 10, s: 20,
+        vars: {
+          '--bg-color': '#141218', '--container-fill': '#211f26', '--container-fill-hover': '#2b2930',
+          '--card-bg': '#2b2930', '--card-bg-hover': '#36343b', '--slider-track': '#36343b',
+          '--text-color': '#e6e0e9', '--hero-text': '#d0bcff', '--btn-bg': '#d0bcff',
+          '--btn-text': '#381e72', '--btn-bg-hover': '#dfcfff', '--btn-secondary-bg': '#36343b',
+          '--btn-secondary-hover': '#413f46', '--ripple-color': 'rgba(20, 18, 24, 0.3)'
+        }
+      },
+      'light': {
+        h: 265, b: 96, s: 25,
+        vars: {
+          '--bg-color': '#fbf8fd', '--container-fill': '#ece5ee', '--container-fill-hover': '#f2edf4',
+          '--card-bg': '#ded5e1', '--card-bg-hover': '#d5cbd8', '--slider-track': '#d5cbd8',
+          '--text-color': '#1d1b20', '--hero-text': '#6750a4', '--btn-bg': '#6750a4',
+          '--btn-text': '#ffffff', '--btn-bg-hover': '#755eb1', '--btn-secondary-bg': '#ded5e1',
+          '--btn-secondary-hover': '#d5cbd8', '--ripple-color': 'rgba(255, 255, 255, 0.25)'
+        }
+      },
+      'discord': {
+        h: 235, b: 21, s: 7,
+        vars: {
+          '--bg-color': '#313338', '--container-fill': '#2b2d31', '--container-fill-hover': '#35373c',
+          '--card-bg': '#383a40', '--card-bg-hover': '#404249', '--slider-track': '#404249',
+          '--text-color': '#f2f3f5', '--hero-text': '#949cf7', '--btn-bg': '#5865f2',
+          '--btn-text': '#ffffff', '--btn-bg-hover': '#4752c4', '--btn-secondary-bg': '#404249',
+          '--btn-secondary-hover': '#4a4d55', '--ripple-color': 'rgba(255, 255, 255, 0.18)'
+        }
+      },
+      'mint': {
+        h: 162, b: 86, s: 48,
+        vars: {
+          '--bg-color': '#caece2', '--container-fill': '#f2fbf7', '--container-fill-hover': '#f8fdfb',
+          '--card-bg': '#dcefe7', '--card-bg-hover': '#d0e8de', '--slider-track': '#c3dfd3',
+          '--text-color': '#13302a', '--hero-text': '#176b5f', '--mark': '#3fb3a1', '--btn-bg': '#176b5f',
+          '--btn-text': '#ffffff', '--btn-bg-hover': '#1d7d6f', '--btn-secondary-bg': '#b5dfcf',
+          '--btn-secondary-hover': '#a6d6c3', '--ripple-color': 'rgba(255, 255, 255, 0.25)'
+        }
+      }
+    };
+
+    function applyPreset(key) {
+      const config = presets[key];
+      if (!config) return;
+
+      themeState.preset = key;
+      themeState.h = config.h;
+      themeState.b = config.b;
+      themeState.s = config.s;
+
+      hueSlider.value = config.h;
+      brightnessSlider.value = config.b;
+      satSlider.value = config.s;
+      [hueSlider, brightnessSlider, satSlider].forEach(syncSlider);
+      syncLabels(config.h, config.b, config.s);
+
+      document.body.style.removeProperty('--mark');
+      Object.entries(config.vars).forEach(([name, value]) => document.body.style.setProperty(name, value));
+    }
+
+    themeCards.forEach((card) => {
+      card.addEventListener('click', () => {
+        themeCards.forEach((c) => c.classList.remove('active'));
+        card.classList.add('active');
+        applyPreset(card.getAttribute('data-preset'));
+      });
+    });
+
+    let introStarted = false;
+
+    let logoBuilt = false;
+    let toolsReady = false;
+
+    function revealGreeting() {
+      if (!logoBuilt || !toolsReady || document.body.classList.contains('ready')) return;
+      document.body.classList.remove('loading');
+      document.body.classList.add('ready');
+      setTimeout(() => document.body.classList.add('intro-done'), 2000);
+    }
+
+    function startIntro() {
+      if (introStarted) return;
+      introStarted = true;
+      document.body.classList.add('intro');
+      setTimeout(() => {
+        logoBuilt = true;
+        if (toolsReady) revealGreeting();
+        else document.body.classList.add('loading');
+      }, 2050);
+    }
+
+    const toolsTitle = document.getElementById('toolsTitle');
+    const toolsDetail = document.getElementById('toolsDetail');
+    const toolsRetry = document.getElementById('toolsRetry');
+    const toolsRing = document.querySelector('.tools-ring');
+
+    function toolsDone() {
+      toolsRing.style.setProperty('--tp', 100);
+      toolsReady = true;
+      setTimeout(revealGreeting, document.body.classList.contains('loading') ? 700 : 0);
+    }
+
+    async function waitForServerPort() {
+      if (!bridge.api || !bridge.api.getServerPort) return null;
+      for (let i = 0; i < 60; i++) {
+        const port = await bridge.serverPort();
+        if (port) return port;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      return null;
+    }
+
+    async function prepareTools() {
+      const port = await waitForServerPort();
+      if (!port) return toolsDone();
+      const api = `http://127.0.0.1:${port}/api`;
+      const headers = { 'X-Ripple-Token': bridge.api.serverToken || '' };
+      fetch(`${api}/hot?limit=12`, { headers }).catch(() => {});
+      const status = async () => {
+        const res = await fetch(`${api}/tools-status`, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      };
+
+      let st;
+      try {
+        st = await status();
+      } catch (e) {
+        return toolsDone();
+      }
+      if (st.ytDlp && st.ffmpeg) return toolsDone();
+
+      const ytShare = st.ytDlp ? 0 : (st.ffmpeg ? 1 : 0.1);
+
+      async function run() {
+        let started = false;
+        let polls = 0;
+        document.body.classList.remove('tools-error');
+        toolsTitle.textContent = 'Getting Ripple ready';
+        toolsDetail.textContent = 'Starting download...';
+        toolsRetry.classList.add('is-hidden');
+        if (!st.progress || st.progress.status !== 'downloading') {
+          const res = await fetch(`${api}/tools-install`, { method: 'POST', headers }).catch(() => null);
+          if (!res || !res.ok) {
+            document.body.classList.add('tools-error');
+            toolsTitle.textContent = "Couldn't download the tools";
+            toolsDetail.textContent = res ? `The download could not start (HTTP ${res.status}).` : 'Ripple could not reach its local server.';
+            toolsRetry.classList.remove('is-hidden');
+            return;
+          }
+        }
+
+        while (true) {
+          await new Promise((r) => setTimeout(r, 600));
+          polls++;
+          try {
+            st = await status();
+          } catch (e) {
+            continue;
+          }
+          const p = st.progress || {};
+          if (p.status === 'downloading') started = true;
+
+          if ((st.ytDlp && st.ffmpeg) || (started && p.status === 'done')) {
+            toolsDetail.textContent = 'All set';
+            return toolsDone();
+          }
+
+          if (p.status === 'error' && (started || polls > 8)) {
+            document.body.classList.add('tools-error');
+            toolsTitle.textContent = "Couldn't download the tools";
+            toolsDetail.textContent = p.error || 'Check your connection and try again.';
+            toolsRetry.classList.remove('is-hidden');
+            return;
+          }
+
+          if (p.status === 'downloading' && p.tool) {
+            const pct = Math.min(100, p.percent || 0);
+            const overall = p.tool === 'yt-dlp' ? pct * ytShare : ytShare * 100 + pct * (1 - ytShare);
+            toolsRing.style.setProperty('--tp', Math.round(overall));
+            toolsDetail.textContent = p.tool === 'ffmpeg' && pct >= 100
+              ? 'Installing ffmpeg...'
+              : `Downloading ${p.tool} · ${pct}%`;
+          }
+        }
+      }
+
+      toolsRetry.addEventListener('click', run);
+      run();
+    }
+
+    prepareTools();
+
+    function scheduleIntro() {
+      if (document.visibilityState === 'visible') {
+        setTimeout(startIntro, 250);
+        return;
+      }
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') setTimeout(startIntro, 250);
+      });
+      setTimeout(startIntro, 8000);
+    }
+
+    Promise.race([document.fonts.ready, new Promise((resolve) => setTimeout(resolve, 1200))]).then(scheduleIntro, scheduleIntro);
+
+    applyPreset('mint');
+
+    const SWITCH_HTML = '<span class="sw-thumb"></span>';
+    document.querySelectorAll('.sw').forEach((sw) => { sw.innerHTML = SWITCH_HTML; });
+
+    const toggles = {};
+    let bgUrl = '';
+
+    const bgPickBtn = document.getElementById('bgPickBtn');
+    const bgSub = document.getElementById('bgSub');
+
+    function bgDisplayName(url) {
+      const raw = url.includes('#') ? decodeURIComponent(url.split('#').pop()) : url;
+      return raw.split(/[\\/]/).pop().split('?')[0];
+    }
+
+    function onToggle(key, on) {
+      toggles[key] = on;
+      bridge.set(key, on ? '1' : '0');
+
+      if (key === 'ripple_no_hand_cursor') document.body.classList.toggle('no-hand-cursor', on);
+      if (key === 'ripple_custom_bg_enabled') bgPickBtn.classList.toggle('is-hidden', !on);
+    }
+
+    document.querySelectorAll('.sw[data-key]').forEach((sw) => {
+      toggles[sw.dataset.key] = sw.classList.contains('on');
+      sw.addEventListener('click', () => {
+        const on = sw.classList.toggle('on');
+        sw.setAttribute('aria-checked', on ? 'true' : 'false');
+        onToggle(sw.dataset.key, on);
+      });
+    });
+
+    document.querySelectorAll('.tile').forEach((tile) => {
+      const sw = tile.querySelector('.sw');
+      if (!sw) return;
+      tile.addEventListener('click', (e) => {
+        if (!e.target.closest('button, input')) sw.click();
+      });
+    });
+
+    bgPickBtn.addEventListener('click', async () => {
+      const picked = await bridge.pickMedia();
+      if (!picked) return;
+      bgUrl = picked;
+      bridge.set('ripple_welcome_bg', bgUrl);
+      bgSub.textContent = bgDisplayName(bgUrl);
+    });
+
+    const discordSwitch = document.getElementById('discordSwitch');
+    const discordSub = document.getElementById('discordSub');
+    const DISCORD_HINT = discordSub.textContent;
+    let discordOn = false;
+
+    async function refreshDiscord() {
+      if (!discordOn) {
+        discordSub.textContent = DISCORD_HINT;
+        return;
+      }
+      const connected = await bridge.discordConnected();
+      discordSub.textContent = connected ? 'Connected to Discord' : 'Waiting for Discord to start';
+    }
+
+    discordSwitch.addEventListener('click', () => {
+      discordOn = discordSwitch.classList.toggle('on');
+      discordSwitch.setAttribute('aria-checked', discordOn ? 'true' : 'false');
+      bridge.discordSetEnabled(discordOn);
+      bridge.set('ripple_discord_rpc', discordOn ? '1' : '0');
+      refreshDiscord();
+      if (discordOn) setTimeout(refreshDiscord, 1800);
+    });
+
+    const launcherSwitch = document.getElementById('launcherSwitch');
+    const launcherSub = document.getElementById('launcherSub');
+    const launcherTitle = document.getElementById('launcherTitle');
+    const launcherRowSub = document.getElementById('launcherRowSub');
+    let launcherOn = true;
+    let launcherAvailable = true;
+
+    function setLauncherUnavailable(text) {
+      launcherAvailable = false;
+      launcherOn = false;
+      launcherSwitch.classList.remove('on');
+      launcherSwitch.classList.add('disabled');
+      launcherSwitch.setAttribute('aria-checked', 'false');
+      launcherRowSub.textContent = text;
+    }
+
+    async function initLauncher() {
+      const info = await bridge.launcherInfo();
+      const platform = info ? info.platform : (navigator.platform || '').toLowerCase().includes('win') ? 'win32' : 'linux';
+
+      if (platform === 'win32') {
+        launcherTitle.textContent = 'Start menu shortcut';
+        launcherSub.textContent = 'Pin Ripple to the Start menu so you can open it by searching.';
+        launcherRowSub.textContent = 'Adds Ripple with its icon to the Start menu';
+      } else {
+        launcherTitle.textContent = 'Applications menu entry';
+        launcherSub.textContent = 'Add Ripple to your applications menu with its icon and description.';
+        launcherRowSub.textContent = 'Creates a launcher that starts the AppImage';
+      }
+
+      if (!info) return;
+      if (!info.canInstall) setLauncherUnavailable(info.reason || 'Not available here');
+      else if (info.installed) launcherRowSub.textContent = 'Ripple is already in your Start menu. Turn this off to remove it.';
+    }
+
+    launcherSwitch.addEventListener('click', () => {
+      if (!launcherAvailable) return;
+      launcherOn = launcherSwitch.classList.toggle('on');
+      launcherSwitch.setAttribute('aria-checked', launcherOn ? 'true' : 'false');
+    });
+
+    initLauncher();
+
+    const spotifyUrl = document.getElementById('spotifyUrl');
+    const spotifyImportBtn = document.getElementById('spotifyImportBtn');
+    const spotifyStatus = document.getElementById('spotifyStatus');
+    let pendingImport = null;
+
+    function isSpotifyPlaylist(url) {
+      return /open\.spotify\.com\/(intl-[a-z]+\/)?playlist\/[A-Za-z0-9]+/.test(url) || /^spotify:playlist:[A-Za-z0-9]+$/.test(url);
+    }
+
+    async function runSpotifyLookup() {
+      const url = spotifyUrl.value.trim();
+      pendingImport = null;
+
+      if (!url) {
+        spotifyStatus.textContent = '';
+        return;
+      }
+      if (!isSpotifyPlaylist(url)) {
+        spotifyStatus.textContent = 'That does not look like a Spotify playlist link';
+        return;
+      }
+
+      spotifyImportBtn.disabled = true;
+      spotifyStatus.textContent = 'Looking up the playlist...';
+
+      const data = await bridge.spotifyLookup(url);
+      spotifyImportBtn.disabled = false;
+
+      if (!data.success || !Array.isArray(data.tracks) || data.tracks.length === 0) {
+        spotifyStatus.textContent = data.error || 'No tracks found in this playlist';
+        return;
+      }
+
+      pendingImport = { url, name: data.name, tracks: data.tracks };
+      spotifyStatus.textContent = `Found ${data.tracks.length} tracks in "${data.name}". They will be added when you finish.`;
+    }
+
+    spotifyImportBtn.addEventListener('click', runSpotifyLookup);
+    spotifyUrl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runSpotifyLookup();
+    });
+
+    const finishBtn = document.getElementById('finishBtn');
+    const finishBtnText = document.getElementById('finishBtnText');
+    const finishBtnIcon = document.getElementById('finishBtnIcon');
+    let finished = false;
+
+    finishBtn.addEventListener('click', async () => {
+      if (finished) return;
+      finished = true;
+
+      if (!pendingImport && spotifyUrl.value.trim() && isSpotifyPlaylist(spotifyUrl.value.trim())) {
+        await runSpotifyLookup();
+      }
+
+      finishBtnText.textContent = 'All Set!';
+      finishBtnIcon.innerHTML = '<path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>';
+
+      const detail = {
+        theme: { ...themeState },
+        toggles: { ...toggles },
+        background: bgUrl || null,
+        discord: discordOn,
+        launcher: launcherOn && launcherAvailable,
+        spotify: pendingImport
+      };
+
+      bridge.set('ripple_welcome_theme', JSON.stringify(detail.theme));
+      bridge.set('ripple_welcome_done', '1');
+
+      setTimeout(() => {
+        viewport.classList.add('closing');
+        window.dispatchEvent(new CustomEvent('ripple:welcome-done', { detail }));
+        setTimeout(() => bridge.finish(detail), 500);
+      }, 700);
+    });
+
+    document.getElementById('winControls').classList.toggle('no-api', !(bridge.api && bridge.api.closeWindow));
+    document.getElementById('winMinBtn').addEventListener('click', () => {
+      if (bridge.api && bridge.api.minimizeWindow) bridge.api.minimizeWindow();
+    });
+    document.getElementById('winCloseBtn').addEventListener('click', () => {
+      if (bridge.api && bridge.api.closeWindow) bridge.api.closeWindow();
+    });
+
+    document.getElementById('skipBtn').addEventListener('click', () => {
+      if (finished) return;
+      finished = true;
+      viewport.classList.add('closing');
+      setTimeout(() => bridge.finish({ skipped: true }), 450);
+    });
+  </script>
+</body>
+</html>
