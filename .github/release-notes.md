@@ -3,9 +3,12 @@
 ## Ripple {tag}
 
 ### Changes
-- The Check for updates button in Settings → About now queries the latest GitHub release and compares it with the installed version.
-- On Windows, a newer version can be installed immediately, with Ripple relaunching afterwards, or on exit. The installer updates the existing installation instead of creating a second one.
-- On macOS and Linux, the update dialog links to the release page for a manual download.
+- On the first launch of each day, Ripple checks the latest GitHub release and downloads a newer installer in the background.
+- When the download finishes, a dialog offers to update now or skip. After skipping, an update button remains in the title bar until the update is installed.
+- The installer runs silently over the existing installation and Ripple reopens automatically.
+- The downloaded installer is verified against the size and SHA-256 digest published with the release.
+- The update dialog now uses the same layout as the other dialogs in the app.
+- When the installed version is already the latest, no message is shown.
 
 ### Installation
 | Platform | File |

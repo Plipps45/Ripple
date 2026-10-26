@@ -166,7 +166,6 @@ pub fn run() {
     app.run(|_app, event| {
         if let RunEvent::Exit = event {
             discord::get().shutdown();
-            updater::install_on_exit();
         }
     });
 }

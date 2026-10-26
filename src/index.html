@@ -178,6 +178,9 @@
       </div>
     </div>
     <div class="titlebar-controls">
+      <button class="titlebar-btn update-btn hidden" id="btn-header-update" title="Update available" aria-label="Update available">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="15"></line><polyline points="7 10 12 15 17 10"></polyline><line x1="5" y1="21" x2="19" y2="21"></line></svg>
+      </button>
       <button class="titlebar-btn" id="btn-mini-player" title="Compact mini player">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="11" y="11" width="8" height="8" rx="1"/></svg>
       </button>
@@ -1749,7 +1752,7 @@
                   </div>
                   <div style="display: flex; flex-direction: column;">
                     <span class="setting-name">Ripple</span>
-                    <span id="about-version" style="font-size: calc(12px * var(--font-scale, 1)); color: var(--md-sys-color-outline);">Version 1.1.0</span>
+                    <span id="about-version" style="font-size: calc(12px * var(--font-scale, 1)); color: var(--md-sys-color-outline);">Version 1.2.0</span>
                   </div>
                 </div>
                 <button class="btn-pill-primary" id="btn-check-updates" style="padding: 6px 14px; font-size: calc(12px * var(--font-scale, 1));">Check for updates</button>
@@ -1783,7 +1786,7 @@
             <span class="settings-credits-text">
               Ripple made by Weebec
             </span>
-            <span class="settings-version-tag">v1.1.0</span>
+            <span class="settings-version-tag">v1.2.0</span>
           </div>
             </div>
           </div>
@@ -2772,7 +2775,16 @@
     </div>
   </div>
 
-  <div class="modal-backdrop hidden" id="update-modal"><div class="settings-card"><div class="settings-card-header"><div class="settings-title-group"><h3 id="update-title">Update available</h3></div><button class="btn-icon-pill" id="btn-close-update" title="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div><p id="update-text" class="custom-lyrics-desc"></p><div class="update-progress hidden" id="update-progress"><i></i></div><div class="download-modal-actions"><button class="btn-outline-pill" id="btn-update-ignore">Skip this version</button><button class="btn-outline-pill" id="btn-update-later">Install on exit</button><button class="btn-pill-primary" id="btn-update-now">Update now</button></div></div></div>
+  <div class="modal-backdrop hidden" id="update-modal">
+    <div class="dialog-card">
+      <h3 id="update-title">Update available</h3>
+      <p id="update-text" style="margin: 0 0 16px; color: var(--md-sys-color-on-surface-variant); font-size: calc(14px * var(--font-scale, 1));"></p>
+      <div class="dialog-actions">
+        <button class="btn-outline-pill" id="btn-update-skip">Skip</button>
+        <button class="btn-pill-primary" id="btn-update-now">Update now</button>
+      </div>
+    </div>
+  </div>
 
   <div class="modal-backdrop hidden" id="sync-mode-overlay">
     <div class="settings-card sync-mode-card">

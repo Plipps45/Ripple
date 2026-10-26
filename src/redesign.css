@@ -198,6 +198,7 @@ body.rp-ui:not(.mini) .titlebar-btn {
 }
 body.rp-ui:not(.mini) .titlebar-btn:hover { color: var(--rp-text) !important; background: var(--rp-chip) !important; }
 body.rp-ui:not(.mini) .titlebar-btn.close-btn:hover { background: #c42b1c !important; color: #fff !important; }
+body.rp-ui:not(.mini) .titlebar-btn.update-btn { color: var(--rp-accent) !important; }
 
 body.rp-ui:not(.mini) .app-layout {
   gap: 0 !important;

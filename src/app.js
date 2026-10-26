@@ -11689,44 +11689,90 @@ document.addEventListener('DOMContentLoaded', async () => {
     const api = window.electronAPI;
     if (!api || !api.checkForUpdates) return;
     const $ = (id) => document.getElementById(id);
-    const modal = $('update-modal'), title = $('update-title'), text = $('update-text'), bar = $('update-progress');
-    const nowB = $('btn-update-now'), laterB = $('btn-update-later'), ignoreB = $('btn-update-ignore');
+    const modal = $('update-modal'), title = $('update-title'), text = $('update-text');
+    const nowB = $('btn-update-now'), skipB = $('btn-update-skip'), headerB = $('btn-header-update'), btn = $('btn-check-updates');
+    const SKIPPED_KEY = 'ripple_update_skipped', CHECK_DAY_KEY = 'ripple_update_check_day';
+    let manual = false, installing = false, readyVersion = null;
     api.getAppVersion().then((v) => {
       const a = $('about-version'); if (a) a.textContent = 'Version ' + v;
       const t = document.querySelector('.settings-version-tag'); if (t) t.textContent = 'v' + v;
     }).catch(() => {});
-    const btn = $('btn-check-updates');
-    if (btn) btn.addEventListener('click', async () => {
-      const r = await api.checkForUpdates();
-      showToast(r && r.ok === false ? 'Updates are checked only in the installed app' : 'Checking for updates...', 'info');
+    const check = (isManual) => {
+      manual = isManual;
+      if (isManual && btn) { btn.disabled = true; btn.textContent = 'Checking...'; }
+      api.checkForUpdates();
+    };
+    // Returns whether the finished check was started from the button.
+    const finishCheck = (succeeded = true) => {
+      if (btn) { btn.disabled = false; btn.textContent = 'Check for updates'; }
+      if (succeeded) localStorage.setItem(CHECK_DAY_KEY, new Date().toDateString());
+      const wasManual = manual;
+      manual = false;
+      return wasManual;
+    };
+    const showReady = () => {
+      title.textContent = 'Ripple ' + readyVersion + ' is ready';
+      text.textContent = 'The new version has been downloaded. Ripple will restart to finish the update.';
+      nowB.classList.remove('hidden');
+      nowB.disabled = skipB.disabled = false;
+      skipB.textContent = 'Skip';
+      openModal(modal);
+    };
+    if (btn) btn.addEventListener('click', () => check(true));
+    headerB.addEventListener('click', showReady);
+    api.onUpdateReady((d) => {
+      const wasManual = finishCheck();
+      readyVersion = d.version;
+      headerB.title = 'Install Ripple ' + d.version;
+      headerB.setAttribute('aria-label', headerB.title);
+      headerB.classList.remove('hidden');
+      if (wasManual || localStorage.getItem(SKIPPED_KEY) !== d.version) showReady();
     });
     api.onUpdateAvailable((d) => {
+      if (!finishCheck()) return;
       title.textContent = 'Ripple ' + d.version + ' is available';
-      bar.classList.add('hidden'); bar.firstElementChild.style.width = '0';
-      nowB.disabled = laterB.disabled = false;
-      nowB.classList.toggle('hidden', !d.canInstall); laterB.classList.toggle('hidden', !d.canInstall);
-      if (d.canInstall) {
-        text.textContent = 'A new version is ready to download.';
-      } else {
-        text.textContent = 'Download the new version manually: ';
-        const link = document.createElement('a');
-        link.href = /^https?:\/\//i.test(String(d.url || '')) ? d.url : '#';
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.textContent = 'open the release page';
-        text.appendChild(link);
-        text.appendChild(document.createTextNode('.'));
-      }
+      text.textContent = 'Download the new version manually: ';
+      const link = document.createElement('a');
+      link.href = /^https?:\/\//i.test(String(d.url || '')) ? d.url : '#';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'open the release page';
+      text.appendChild(link);
+      text.appendChild(document.createTextNode('.'));
+      nowB.classList.add('hidden');
+      skipB.textContent = 'Close';
       openModal(modal);
     });
-    api.onUpdateProgress((d) => { bar.classList.remove('hidden'); bar.firstElementChild.style.width = d.percent + '%'; text.textContent = 'Downloading... ' + d.percent + '%'; });
-    api.onUpdateReady(() => { text.textContent = 'Update downloaded. It will be installed when you close Ripple.'; nowB.classList.add('hidden'); laterB.classList.add('hidden'); });
-    api.onUpdateError((d) => showToast('Update error: ' + d.message, 'error'));
-    api.onUpdateNotAvailable((d) => showToast('You are on the latest version (' + d.version + ')', 'info'));
-    nowB.addEventListener('click', () => { api.updateAction('now'); nowB.disabled = laterB.disabled = true; text.textContent = 'Downloading...'; });
-    laterB.addEventListener('click', () => { api.updateAction('later'); closeModal(modal); showToast('The update will be installed when you close Ripple', 'info'); });
-    ignoreB.addEventListener('click', () => { api.updateAction('ignore'); closeModal(modal); });
-    $('btn-close-update').addEventListener('click', () => closeModal(modal));
+    api.onUpdateNotAvailable(() => {
+      finishCheck();
+      localStorage.removeItem(SKIPPED_KEY);
+      headerB.classList.add('hidden');
+    });
+    api.onUpdateError((d) => {
+      const wasManual = finishCheck(false);
+      if (installing) {
+        installing = false;
+        nowB.disabled = skipB.disabled = false;
+        text.textContent = 'The update could not be installed.';
+      } else if (!wasManual) {
+        return;
+      }
+      showToast('Update error: ' + d.message, 'error');
+    });
+    nowB.addEventListener('click', () => {
+      installing = true;
+      nowB.disabled = skipB.disabled = true;
+      text.textContent = 'Installing... Ripple will reopen in a moment.';
+      api.updateAction('now');
+    });
+    skipB.addEventListener('click', () => {
+      if (readyVersion && !nowB.classList.contains('hidden')) localStorage.setItem(SKIPPED_KEY, readyVersion);
+      closeModal(modal);
+    });
+    // First launch of the day checks automatically; a skipped update is looked up again to restore the header icon.
+    if (localStorage.getItem(CHECK_DAY_KEY) !== new Date().toDateString() || localStorage.getItem(SKIPPED_KEY)) {
+      setTimeout(() => check(false), 5000);
+    }
   })();
 
   function isTextInput(target) {

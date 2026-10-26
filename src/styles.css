@@ -354,6 +354,9 @@ body.is-playing .shape-triangle {
   background: var(--md-sys-color-surface-container-high);
   color: var(--md-sys-color-on-surface);
 }
+.titlebar-btn.update-btn {
+  color: var(--md-sys-color-primary);
+}
 .titlebar-btn.close-btn:hover {
   background: var(--md-sys-color-error);
   color: var(--md-sys-color-on-error);
@@ -6518,9 +6521,6 @@ body.hidden-window *::after {
 .lyrics-action-btn, #btn-close-custom-lyrics, #btn-cancel-sync { background-color: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent) !important; border: 0 !important; box-shadow: none !important; }
 .lyrics-action-btn:hover, #btn-close-custom-lyrics:hover, #btn-cancel-sync:hover { background-color: color-mix(in srgb, var(--md-sys-color-on-surface) 16%, transparent) !important; }
 
-.update-progress { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--md-sys-color-on-surface) 16%, transparent); overflow: hidden; margin: 12px 0; }
-.update-progress i { display: block; height: 100%; width: 0; background: var(--md-sys-color-primary); transition: width .2s ease; }
-.update-progress.hidden { display: none; }
 
 body:not(.highlight-buttons) .btn-pill-primary { background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface-variant); }
 body:not(.highlight-buttons) .btn-pill-primary:hover { background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface); }

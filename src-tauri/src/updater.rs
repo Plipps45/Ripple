@@ -1,17 +1,17 @@
 use crate::commands::emit_main;
-use crate::{logger, window};
-use futures_util::StreamExt;
+use crate::window;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::AppHandle;
-use tokio::io::AsyncWriteExt;
 
 const LATEST_RELEASE: &str = "https://api.github.com/repos/Plipps45/Ripple/releases/latest";
 
-static PENDING_URL: Mutex<Option<String>> = Mutex::new(None);
-static INSTALL_ON_EXIT: Mutex<Option<PathBuf>> = Mutex::new(None);
+static CHECKING: AtomicBool = AtomicBool::new(false);
+static READY: Mutex<Option<(String, PathBuf)>> = Mutex::new(None);
 
 fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -44,101 +44,101 @@ async fn fetch_latest() -> Result<Value, String> {
 }
 
 pub fn check(app: AppHandle) {
+    if CHECKING.swap(true, Ordering::SeqCst) {
+        return;
+    }
     tauri::async_runtime::spawn(async move {
-        let rel = match fetch_latest().await {
-            Ok(v) => v,
-            Err(e) => return emit_main(&app, "update-error", json!({ "message": e })),
-        };
-        let current = app.package_info().version.to_string();
-        let tag = rel["tag_name"].as_str().unwrap_or("");
-        let newer = matches!((parse_version(tag), parse_version(&current)), (Some(l), Some(c)) if l > c);
-        if !newer {
-            return emit_main(&app, "update-not-available", json!({ "version": current }));
+        if let Err(e) = find_and_download(&app).await {
+            emit_main(&app, "update-error", json!({ "message": e }));
         }
-        let installer = rel["assets"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|a| a["name"].as_str().is_some_and(|n| n.ends_with("-setup.exe")))
-            .and_then(|a| a["browser_download_url"].as_str())
-            .map(String::from);
-        // Dev builds would install the released app over nothing, so they only get the release link.
-        let can_install = cfg!(windows) && !cfg!(debug_assertions) && installer.is_some();
-        *PENDING_URL.lock().unwrap() = installer;
-        emit_main(&app, "update-available", json!({
-            "version": tag.trim_start_matches(['v', 'V']),
-            "canInstall": can_install,
-            "url": rel["html_url"],
-        }));
+        CHECKING.store(false, Ordering::SeqCst);
     });
 }
 
-pub fn action(app: AppHandle, action: &str) {
-    let now = match action {
-        "now" => true,
-        "later" => false,
-        _ => return,
+async fn find_and_download(app: &AppHandle) -> Result<(), String> {
+    if let Some((version, _)) = READY.lock().unwrap().clone() {
+        emit_main(app, "update-ready", json!({ "version": version }));
+        return Ok(());
+    }
+    let rel = fetch_latest().await?;
+    let current = app.package_info().version.to_string();
+    let latest = match (parse_version(rel["tag_name"].as_str().unwrap_or("")), parse_version(&current)) {
+        (Some(l), Some(c)) if l > c => l,
+        _ => {
+            emit_main(app, "update-not-available", json!({ "version": current }));
+            return Ok(());
+        }
     };
-    let Some(url) = PENDING_URL.lock().unwrap().take() else { return };
-    tauri::async_runtime::spawn(async move {
-        let path = match download(&app, &url).await {
-            Ok(p) => p,
-            Err(e) => return emit_main(&app, "update-error", json!({ "message": e })),
-        };
-        if !now {
-            *INSTALL_ON_EXIT.lock().unwrap() = Some(path);
-            return emit_main(&app, "update-ready", json!({}));
+    let version = format!("{}.{}.{}", latest.0, latest.1, latest.2);
+    let installer = rel["assets"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|a| a["name"].as_str().is_some_and(|n| n.ends_with("-setup.exe")));
+    // Dev builds would install the released app over nothing, so they only get the release link.
+    let installer = match installer {
+        Some(a) if cfg!(windows) && !cfg!(debug_assertions) => a,
+        _ => {
+            emit_main(app, "update-available", json!({ "version": version, "url": rel["html_url"] }));
+            return Ok(());
         }
-        match run_installer(&path, true) {
-            Ok(()) => window::quit_app(&app),
-            Err(e) => emit_main(&app, "update-error", json!({ "message": e.to_string() })),
-        }
-    });
+    };
+    let path = download(&version, installer).await?;
+    *READY.lock().unwrap() = Some((version.clone(), path));
+    emit_main(app, "update-ready", json!({ "version": version }));
+    Ok(())
 }
 
-async fn download(app: &AppHandle, url: &str) -> Result<PathBuf, String> {
+fn verified(bytes: &[u8], size: u64, sha256: Option<&str>) -> bool {
+    (size == 0 || bytes.len() as u64 == size) && sha256.map_or(true, |d| hex::encode(Sha256::digest(bytes)) == d)
+}
+
+async fn download(version: &str, asset: &Value) -> Result<PathBuf, String> {
+    let url = asset["browser_download_url"].as_str().ok_or("release has no installer url")?;
+    let size = asset["size"].as_u64().unwrap_or(0);
+    let sha256 = asset["digest"].as_str().and_then(|d| d.strip_prefix("sha256:")).map(str::to_ascii_lowercase);
     let dir = std::env::temp_dir().join("ripple-update");
     tokio::fs::create_dir_all(&dir).await.map_err(err)?;
-    let path = dir.join("ripple-setup.exe");
-    let res = client()?.get(url).send().await.map_err(err)?.error_for_status().map_err(err)?;
-    let total = res.content_length().unwrap_or(0);
-    let mut file = tokio::fs::File::create(&path).await.map_err(err)?;
-    let mut stream = res.bytes_stream();
-    let (mut got, mut last_pct) = (0u64, u64::MAX);
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(err)?;
-        file.write_all(&chunk).await.map_err(err)?;
-        got += chunk.len() as u64;
-        let pct = if total > 0 { got * 100 / total } else { 0 };
-        if pct != last_pct {
-            last_pct = pct;
-            emit_main(app, "update-progress", json!({ "percent": pct }));
-        }
+    let path = dir.join(format!("ripple-{version}-setup.exe"));
+    if tokio::fs::read(&path).await.is_ok_and(|b| verified(&b, size, sha256.as_deref())) {
+        return Ok(path);
     }
-    file.flush().await.map_err(err)?;
-    if total > 0 && got != total {
-        return Err("download incomplete".into());
+    let bytes = client()?
+        .get(url)
+        .send()
+        .await
+        .map_err(err)?
+        .error_for_status()
+        .map_err(err)?
+        .bytes()
+        .await
+        .map_err(err)?;
+    if !verified(&bytes, size, sha256.as_deref()) {
+        return Err("downloaded installer failed verification".into());
     }
+    tokio::fs::write(&path, &bytes).await.map_err(err)?;
     Ok(path)
 }
 
-// Tauri NSIS flags: /UPDATE reuses the existing install, /P shows progress only, /S is silent, /R relaunches Ripple.
-fn run_installer(path: &Path, relaunch: bool) -> std::io::Result<()> {
-    let args: &[&str] = if relaunch { &["/UPDATE", "/P", "/R"] } else { &["/UPDATE", "/S"] };
-    std::process::Command::new(path).args(args).spawn().map(|_| ())
+pub fn action(app: AppHandle, action: &str) {
+    if action != "now" {
+        return;
+    }
+    let Some(path) = READY.lock().unwrap().as_ref().map(|r| r.1.clone()) else { return };
+    match run_installer(&path) {
+        Ok(()) => window::quit_app(&app),
+        Err(e) => emit_main(&app, "update-error", json!({ "message": e.to_string() })),
+    }
 }
 
-pub fn install_on_exit() {
-    if let Some(path) = INSTALL_ON_EXIT.lock().unwrap().take() {
-        if let Err(e) = run_installer(&path, false) {
-            logger::error("Update install failed", e);
-        }
-    }
+// Tauri NSIS flags: /UPDATE reuses the existing install, /S hides the installer, /R relaunches Ripple.
+fn run_installer(path: &Path) -> std::io::Result<()> {
+    std::process::Command::new(path).args(["/UPDATE", "/S", "/R"]).spawn().map(|_| ())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse_version;
+    use super::{parse_version, verified};
 
     #[test]
     fn compares_versions() {
@@ -148,5 +148,14 @@ mod tests {
         assert_eq!(parse_version("latest"), None);
         assert!(parse_version("v1.0.10") > parse_version("1.0.9"));
         assert!(parse_version("v1.0.0") == parse_version("1.0.0"));
+    }
+
+    #[test]
+    fn verifies_installer() {
+        let abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        assert!(verified(b"abc", 3, Some(abc)));
+        assert!(verified(b"abc", 0, None));
+        assert!(!verified(b"abc", 4, Some(abc)));
+        assert!(!verified(b"abd", 3, Some(abc)));
     }
 }
