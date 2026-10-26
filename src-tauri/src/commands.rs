@@ -103,13 +103,14 @@ pub fn get_app_version(app: AppHandle) -> String {
 }
 
 #[tauri::command]
-pub fn update_check() -> Value {
-    json!({ "ok": false, "reason": "dev" })
+pub fn update_check(app: AppHandle) -> Value {
+    crate::updater::check(app);
+    json!({ "ok": true })
 }
 
 #[tauri::command]
-pub fn update_action(action: String) {
-    let _ = action;
+pub fn update_action(app: AppHandle, action: String) {
+    crate::updater::action(app, &action);
 }
 
 #[tauri::command]

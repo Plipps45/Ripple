@@ -1,6 +1,6 @@
 {
   "name": "ripple",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Ripple audio player (Tauri + Rust).",
   "author": "Weebec",

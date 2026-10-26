@@ -48,6 +48,12 @@ jobs:
 
       - run: npm ci
 
+      - name: Release notes
+        id: notes
+        shell: bash
+        run: |
+          { echo 'body<<EOF'; sed "s/{tag}/${GITHUB_REF_NAME}/g" .github/release-notes.md; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -55,7 +61,7 @@ jobs:
           args: ${{ matrix.args }}
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
           releaseName: Ripple ${{ github.ref_name }}
-          releaseBody: See the assets below to download Ripple for Windows, macOS or Linux.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
 

@@ -8,6 +8,7 @@ pub mod server;
 mod state;
 #[cfg(windows)]
 mod thumbbar;
+mod updater;
 mod window;
 
 use paths::Paths;
@@ -165,6 +166,7 @@ pub fn run() {
     app.run(|_app, event| {
         if let RunEvent::Exit = event {
             discord::get().shutdown();
+            updater::install_on_exit();
         }
     });
 }

@@ -95,6 +95,7 @@ Search, stream, download, sing along with real-time synced lyrics, shape the sou
 - **Windows taskbar thumbnail buttons**: shuffle, previous, play/pause, next and repeat.
 - **Discord Rich Presence** showing what you are listening to.
 - Animated launch intro and a first-run welcome screen.
+- **In-app updates on Windows**: Settings → About → Check for updates downloads the latest GitHub release and installs it over the current installation, then relaunches Ripple.
 
 ### Under the hood
 - Local HTTP server (axum) bound to `127.0.0.1` and protected with a per-session token.
@@ -127,11 +128,11 @@ Download the installer for your system from the **[latest release](https://githu
 
 | System | File | How to install |
 | --- | --- | --- |
-| **Windows 10/11** | `Ripple_1.0.0_x64-setup.exe` | Run the installer. No admin rights needed (installs for the current user). |
-| **macOS** (Apple Silicon & Intel) | `Ripple_1.0.0_universal.dmg` | Open the DMG and drag **Ripple** to **Applications**. |
-| **Debian / Ubuntu** | `Ripple_1.0.0_amd64.deb` | `sudo apt install ./Ripple_1.0.0_amd64.deb` |
-| **Fedora / openSUSE** | `Ripple-1.0.0-1.x86_64.rpm` | `sudo dnf install ./Ripple-1.0.0-1.x86_64.rpm` |
-| **Any Linux** | `Ripple_1.0.0_amd64.AppImage` | `chmod +x Ripple_*.AppImage && ./Ripple_*.AppImage` |
+| **Windows 10/11** | `Ripple_1.1.0_x64-setup.exe` | Run the installer. No admin rights needed (installs for the current user). |
+| **macOS** (Apple Silicon & Intel) | `Ripple_1.1.0_universal.dmg` | Open the DMG and drag **Ripple** to **Applications**. |
+| **Debian / Ubuntu** | `Ripple_1.1.0_amd64.deb` | `sudo apt install ./Ripple_1.1.0_amd64.deb` |
+| **Fedora / openSUSE** | `Ripple-1.1.0-1.x86_64.rpm` | `sudo dnf install ./Ripple-1.1.0-1.x86_64.rpm` |
+| **Any Linux** | `Ripple_1.1.0_amd64.AppImage` | `chmod +x Ripple_*.AppImage && ./Ripple_*.AppImage` |
 
 On first launch Ripple downloads `yt-dlp` and `ffmpeg` automatically. You can also place them in the `bin/` folder or point to them with the `RIPPLE_YTDLP` and `RIPPLE_FFMPEG` environment variables.
 
