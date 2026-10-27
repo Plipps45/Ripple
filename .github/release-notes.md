@@ -3,12 +3,9 @@
 ## Ripple {tag}
 
 ### Changes
-- On the first launch of each day, Ripple checks the latest GitHub release and downloads a newer installer in the background.
-- When the download finishes, a dialog offers to update now or skip. After skipping, an update button remains in the title bar until the update is installed.
-- The installer runs silently over the existing installation and Ripple reopens automatically.
-- The downloaded installer is verified against the size and SHA-256 digest published with the release.
-- The update dialog now uses the same layout as the other dialogs in the app.
-- When the installed version is already the latest, no message is shown.
+- The sidebar has a new Import playlist button above Hide menu. It opens a small panel to choose the source: Spotify, YouTube, YouTube Music, SoundCloud or Apple Music.
+- Each option opens the same import dialog used in Settings > Integrations.
+- The README installation commands for Debian and Fedora now use the current package names.
 
 ### Installation
 | Platform | File |

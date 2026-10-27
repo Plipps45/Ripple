@@ -296,6 +296,37 @@
         <div class="playlists-list" id="playlists-list"></div>
       </div>
 
+      <div class="side-import">
+        <button class="rail-icon-btn" id="btn-toggle-side-import" type="button" title="Import playlist" aria-expanded="false" aria-controls="side-import-panel">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <svg class="side-pl-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="side-import-panel" id="side-import-panel" hidden>
+          <button class="side-import-item" type="button" data-import="btn-open-spotify-import">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7.5-.7 10.5 1"/><path d="M7.5 12.7c3-.8 6-.5 8.5.9"/><path d="M8 15.8c2.5-.6 4.5-.4 6.5.7"/></svg>
+            <span>Spotify</span>
+          </button>
+          <button class="side-import-item" type="button" data-import="btn-open-link-import">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.070 0 12 0 12s0 3.930.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.930 24 12 24 12s0-3.930-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            <span>YouTube</span>
+          </button>
+          <button class="side-import-item" type="button" data-import="btn-open-ytm-import">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.180-7.104-7.104S8.076 4.896 12 4.896s7.104 3.180 7.104 7.104-3.180 7.104-7.104 7.104zm0-13.333c-3.440 0-6.229 2.789-6.229 6.229s2.789 6.229 6.229 6.229 6.229-2.789 6.229-6.229-2.789-6.229-6.229-6.229zm-1.750 9.138V9.091l5.426 3.092-5.426 3.092z"/></svg>
+            <span>YouTube Music</span>
+          </button>
+          <button class="side-import-item" type="button" data-import="btn-open-sc-import">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M1.175 12.225c-.051 0-.094.044-.103.097l-.29 3.01c-.01.076.046.14.122.14.051 0 .094-.043.103-.097l.29-3.01a.117.117 0 0 0-.122-.14zm1.037-1.127c-.06 0-.11.048-.12.112l-.438 4.148c-.01.082.05.15.132.15.06 0 .11-.048.12-.112l.438-4.148c.01-.082-.05-.15-.132-.15zm1.096-.693c-.07 0-.13.054-.14.126l-.496 4.838c-.01.088.055.163.143.163.07 0 .13-.054.14-.126l.496-4.838c.01-.088-.055-.163-.143-.163zm1.144-.436c-.08 0-.148.06-.16.142l-.527 5.275c-.01.094.06.175.154.175.08 0 .148-.06.16-.142l.527-5.275c.01-.094-.06-.175-.154-.175zm1.180-.328c-.09 0-.165.068-.178.16l-.525 5.603c-.01.1.066.187.168.187.09 0 .165-.068.178-.16l.525-5.603c.01-.1-.066-.187-.168-.187zm1.205-.109c-.1 0-.183.075-.198.176l-.504 5.712c-.01.106.072.198.179.198.1 0 .183-.075.198-.176l.504-5.712c.01-.106-.072-.198-.179-.198zm1.222.054c-.11 0-.2.083-.217.195l-.47 5.658c-.01.112.078.21.192.21.11 0 .2-.083.217-.195l.47-5.658c.01-.112-.078-.21-.192-.21zm1.233.273c-.12 0-.218.09-.236.213l-.427 5.385c-.01.12.083.22.206.22.12 0 .218-.09.236-.213l.427-5.385c.01-.12-.083-.22-.206-.22zm1.238.655c-.13 0-.236.1-.255.232l-.374 4.730c-.01.126.09.232.22.232.13 0 .236-.1.255-.232l.374-4.730c.01-.126-.09-.232-.22-.232zm3.328-4.323c-.31 0-.61.05-.89.15a3.490 3.490 0 0 0-2.020-1.460c-.14-.04-.26.06-.26.2v8.940c0 .12.1.22.22.22h6.140c1.930 0 3.500-1.570 3.500-3.500s-1.570-3.500-3.500-3.500c-.38 0-.74.06-1.070.18-.08-1.590-1.390-2.850-3.030-2.850z"/></svg>
+            <span>SoundCloud</span>
+          </button>
+          <button class="side-import-item" type="button" data-import="btn-open-apple-import">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            <span>Apple Music</span>
+          </button>
+        </div>
+      </div>
+
       <button class="rail-hide-btn" id="btn-hide-sidebar" type="button" title="Hide menu" aria-controls="sidebar">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="9" y1="4" x2="9" y2="20"></line><polyline points="16 10 14 12 16 14"></polyline>

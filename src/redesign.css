@@ -215,7 +215,7 @@ body.rp-ui:not(.mini) .main-content {
   border: 0 !important;
 }
 
-.rail-hide-btn { display: none; }
+.rail-hide-btn, .side-import { display: none; }
 body.rp-ui:not(.mini) .sidebar {
   position: relative !important;
   inset: auto !important;
@@ -309,7 +309,7 @@ body.rp-ui:not(.mini) .sidebar :is(.rail-icon-btn, .rail-hide-btn) svg { width: 
 body.rp-ui:not(.mini) .sidebar .rail-hide-btn {
   display: flex;
   align-items: center;
-  margin-top: auto;
+  margin-top: 4px;
   border-radius: 9999px !important;
   height: calc(40px * var(--font-scale, 1)) !important;
   font-size: calc(13px * var(--font-scale, 1));
@@ -325,8 +325,46 @@ body.rp-ui:not(.mini) .sidebar .rail-icon-btn::after {
 body.rp-ui:not(.mini) .sidebar > :not(.side-playlists) { flex-shrink: 0; }
 body.rp-ui:not(.mini) .sidebar .side-pl-chevron { order: 2; margin-left: auto; opacity: 0.7; transition: transform 200ms cubic-bezier(0.2, 0, 0, 1); }
 body.rp-ui:not(.mini) .sidebar .rail-icon-btn::after { order: 1; }
-body.rp-ui:not(.mini) #btn-toggle-playlists-drawer[aria-expanded="true"] .side-pl-chevron { transform: rotate(180deg); }
-.side-playlists[hidden] { display: none !important; }
+/* The import panel opens upward, so its chevron points up while closed. */
+body.rp-ui:not(.mini) :is(#btn-toggle-playlists-drawer[aria-expanded="true"], #btn-toggle-side-import[aria-expanded="false"]) .side-pl-chevron { transform: rotate(180deg); }
+.side-playlists[hidden], .side-import-panel[hidden] { display: none !important; }
+body.rp-ui:not(.mini) .side-import { display: flex; flex-direction: column; position: relative; margin-top: auto; }
+body.rp-ui:not(.mini) #btn-toggle-side-import { white-space: nowrap; }
+/* Floats above the button so opening it never pushes "Hide menu" out of a short sidebar. */
+body.rp-ui:not(.mini) .side-import-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--rp-line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: sideImportIn 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+@keyframes sideImportIn { from { opacity: 0; transform: translateY(6px); } }
+body.rp-ui:not(.mini) .side-import-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: calc(38px * var(--font-scale, 1));
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font: inherit;
+  font-size: calc(13.5px * var(--font-scale, 1));
+  text-align: left;
+  cursor: pointer;
+}
+body.rp-ui:not(.mini) .side-import-item:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent); color: var(--md-sys-color-on-surface); }
+body.rp-ui:not(.mini) .side-import-item svg { width: calc(18px * var(--font-scale, 1)); height: calc(18px * var(--font-scale, 1)); flex-shrink: 0; }
 body.rp-ui:not(.mini) .side-playlists {
   display: flex;
   flex-direction: column;

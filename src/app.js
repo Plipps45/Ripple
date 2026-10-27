@@ -1922,6 +1922,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { sideOpen = localStorage.getItem(SIDE_PLAYLISTS_KEY) === '1'; } catch (_) {}
     if (sideOpen) setSidePlaylistsOpen(true);
   }
+  const btnToggleSideImport = document.getElementById('btn-toggle-side-import');
+  const sideImportPanel = document.getElementById('side-import-panel');
+  function setSideImportOpen(open) {
+    sideImportPanel.hidden = !open;
+    btnToggleSideImport.classList.toggle('active', open);
+    btnToggleSideImport.setAttribute('aria-expanded', String(open));
+  }
+  if (btnToggleSideImport && sideImportPanel) {
+    btnToggleSideImport.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setSideImportOpen(sideImportPanel.hidden);
+    });
+    // Each item forwards to its Import button in Settings > Integrations, which owns the modal logic.
+    sideImportPanel.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-import]');
+      if (!item) return;
+      setSideImportOpen(false);
+      const target = document.getElementById(item.dataset.import);
+      if (target) target.click();
+    });
+    document.addEventListener('click', (e) => {
+      if (!sideImportPanel.hidden && !e.target.closest('.side-import')) setSideImportOpen(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !sideImportPanel.hidden) setSideImportOpen(false);
+    });
+  }
   const btnSideCreatePlaylist = document.getElementById('btn-side-create-playlist');
   if (btnSideCreatePlaylist) {
     btnSideCreatePlaylist.addEventListener('click', () => { if (el.btnNewPlaylist) el.btnNewPlaylist.click(); });

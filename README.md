@@ -128,11 +128,11 @@ Download the installer for your system from the **[latest release](https://githu
 
 | System | File | How to install |
 | --- | --- | --- |
-| **Windows 10/11** | `Ripple_1.2.0_x64-setup.exe` | Run the installer. No admin rights needed (installs for the current user). |
-| **macOS** (Apple Silicon & Intel) | `Ripple_1.2.0_universal.dmg` | Open the DMG and drag **Ripple** to **Applications**. |
-| **Debian / Ubuntu** | `Ripple_1.2.0_amd64.deb` | `sudo apt install ./Ripple_1.1.0_amd64.deb` |
-| **Fedora / openSUSE** | `Ripple-1.2.0-1.x86_64.rpm` | `sudo dnf install ./Ripple-1.1.0-1.x86_64.rpm` |
-| **Any Linux** | `Ripple_1.2.0_amd64.AppImage` | `chmod +x Ripple_*.AppImage && ./Ripple_*.AppImage` |
+| **Windows 10/11** | `Ripple_1.3.0_x64-setup.exe` | Run the installer. No admin rights needed (installs for the current user). |
+| **macOS** (Apple Silicon & Intel) | `Ripple_1.3.0_universal.dmg` | Open the DMG and drag **Ripple** to **Applications**. |
+| **Debian / Ubuntu** | `Ripple_1.3.0_amd64.deb` | `sudo apt install ./Ripple_1.3.0_amd64.deb` |
+| **Fedora / openSUSE** | `Ripple-1.3.0-1.x86_64.rpm` | `sudo dnf install ./Ripple-1.3.0-1.x86_64.rpm` |
+| **Any Linux** | `Ripple_1.3.0_amd64.AppImage` | `chmod +x Ripple_*.AppImage && ./Ripple_*.AppImage` |
 
 On first launch Ripple downloads `yt-dlp` and `ffmpeg` automatically. You can also place them in the `bin/` folder or point to them with the `RIPPLE_YTDLP` and `RIPPLE_FFMPEG` environment variables.
 
