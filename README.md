@@ -41,6 +41,7 @@ Search, stream, download, sing along with real-time synced lyrics, shape the sou
 - Artist results inside search, plus **artist profiles** with popular tracks, albums and a live **biography** (Wikipedia, MusicBrainz and Wikidata).
 - **Discover** home with the play queue, **Suggested albums** from the current artist, **My Ripple** recommendations, **Hot picks**, **Your daily** mix, **Your top tracks** and **Jump back in**.
 - **Command palette** (`Ctrl + K`) to jump anywhere in the app.
+- **Search suggestions** while typing: a dropdown lists matching artists and related searches, navigable with the arrow keys.
 
 ### Playback
 - Smart stream resolution: offline cache → downloads folder → short-lived URL cache → `yt-dlp`.
@@ -55,6 +56,7 @@ Search, stream, download, sing along with real-time synced lyrics, shape the sou
 - **Automatic lyric offset for music videos**: Ripple correlates the audio of the video with the album version and shifts the lyrics to match long intros.
 - **Lyrics translation** with optional auto-translate and a choice of target language.
 - **Custom lyrics editor** to write or fix your own synced lyrics.
+- **Missing lyrics panel**: when a track has no lyrics, the panel shows the artist picture and biography, with options to import a `.lrc` or `.txt` file or paste the lyrics.
 - Right-to-left script support (Arabic, Hebrew…).
 - Full-screen **TV Karaoke** mode with optional visualizer and multiple lyric animation styles.
 
@@ -62,11 +64,11 @@ Search, stream, download, sing along with real-time synced lyrics, shape the sou
 - **10-band equalizer** plus quick Low / Mid / High controls, with savable, renamable **presets** and smooth preset transitions.
 - **High Quality enhancement engine**: Vocal Clarity, High-End Air and Bass Depth.
 - **Volume normalization**, volume gain, **reverb**, **echo** and **distortion** effects.
-- Selectable **audio output device**.
+- Selectable **audio output device** on Windows, from the fullscreen view.
 - Real-time **audio visualizers** for the bottom bar, karaoke mode and lyrics panel.
 
 ### Library & playlists
-- **Favorites**, **History**, and unlimited **playlists**.
+- **Favorites**, **History**, and unlimited **playlists**, which can be renamed from the playlist view or the right-click menu.
 - **My files**: play your local music folder alongside streaming sources.
 - **Import playlists** from **Spotify**, **Apple Music** and **YouTube**, or from any supported link.
 - **Edit track info** and **customize track art**.
@@ -128,11 +130,11 @@ Download the installer for your system from the **[latest release](https://githu
 
 | System | File | How to install |
 | --- | --- | --- |
-| **Windows 10/11** | `Ripple_1.3.0_x64-setup.exe` | Run the installer. No admin rights needed (installs for the current user). |
-| **macOS** (Apple Silicon & Intel) | `Ripple_1.3.0_universal.dmg` | Open the DMG and drag **Ripple** to **Applications**. |
-| **Debian / Ubuntu** | `Ripple_1.3.0_amd64.deb` | `sudo apt install ./Ripple_1.3.0_amd64.deb` |
-| **Fedora / openSUSE** | `Ripple-1.3.0-1.x86_64.rpm` | `sudo dnf install ./Ripple-1.3.0-1.x86_64.rpm` |
-| **Any Linux** | `Ripple_1.3.0_amd64.AppImage` | `chmod +x Ripple_*.AppImage && ./Ripple_*.AppImage` |
+| **Windows 10/11** | `Ripple_1.4.0_x64-setup.exe` | Run the installer. No admin rights needed (installs for the current user). |
+| **macOS** (Apple Silicon & Intel) | `Ripple_1.4.0_universal.dmg` | Open the DMG and drag **Ripple** to **Applications**. |
+| **Debian / Ubuntu** | `Ripple_1.4.0_amd64.deb` | `sudo apt install ./Ripple_1.4.0_amd64.deb` |
+| **Fedora / openSUSE** | `Ripple-1.4.0-1.x86_64.rpm` | `sudo dnf install ./Ripple-1.4.0-1.x86_64.rpm` |
+| **Any Linux** | `Ripple_1.4.0_amd64.AppImage` | `chmod +x Ripple_*.AppImage && ./Ripple_*.AppImage` |
 
 On first launch Ripple downloads `yt-dlp` and `ffmpeg` automatically. You can also place them in the `bin/` folder or point to them with the `RIPPLE_YTDLP` and `RIPPLE_FFMPEG` environment variables.
 

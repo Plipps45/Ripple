@@ -92,30 +92,6 @@ test('origin and host guards match the Electron server', async () => {
   assert.strictEqual(pre.headers['access-control-allow-methods'], 'GET, POST, OPTIONS');
 });
 
-test('Spotify login reports callback errors and protects account routes', async () => {
-  for (const route of ['/api/spotify-auth-start?clientId=' + 'a'.repeat(32), '/api/spotify-status', '/api/spotify-library?likes=1', '/api/spotify-logout']) {
-    assert.strictEqual((await request(route)).status, 403, route);
-  }
-  assert.strictEqual((await request('/api/spotify-auth-start?clientId=nope', { auth: true })).status, 400);
-  const start = await request('/api/spotify-auth-start?clientId=' + 'a'.repeat(32), { auth: true });
-  assert.strictEqual(start.status, 200);
-  const authUrl = new URL(start.json.url);
-  assert.strictEqual(authUrl.searchParams.get('redirect_uri'), start.json.redirectUri);
-  assert.strictEqual(start.json.redirectUri, `http://127.0.0.1:${port}/api/spotify-callback`);
-  assert.strictEqual(authUrl.searchParams.get('code_challenge_method'), 'S256');
-  assert.match(authUrl.searchParams.get('code_challenge'), /^[A-Za-z0-9_-]{43}$/);
-  const state = authUrl.searchParams.get('state');
-  assert.strictEqual((await request('/api/spotify-callback?state=wrong&error=access_denied')).status, 400);
-  const cb = await request(`/api/spotify-callback?state=${state}&error=access_denied`);
-  assert.strictEqual(cb.status, 400);
-  assert.match(cb.headers['content-type'], /text\/html/);
-  const status = (await request('/api/spotify-status', { auth: true })).json;
-  assert.strictEqual(status.connected, false);
-  assert.match(status.error, /denied/i);
-  assert.strictEqual((await request('/api/spotify-library?likes=1', { auth: true })).status, 401);
-  assert.deepStrictEqual((await request('/api/spotify-logout', { auth: true })).json, { success: true });
-});
-
 test('local library: add, list, stream with Range, update, remove', async () => {
   const libDir = path.join(dataDir, 'library');
   fs.mkdirSync(libDir, { recursive: true });

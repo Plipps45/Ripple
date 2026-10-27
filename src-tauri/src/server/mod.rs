@@ -35,15 +35,12 @@ const TOKEN_PROTECTED_ROUTES: &[&str] = &[
     "/api/translate",
     "/api/vibe",
     "/api/search",
+    "/api/suggest",
     "/api/artist",
     "/api/lyrics",
     "/api/lyrics-offset",
     "/api/download",
     "/api/spotify-import",
-    "/api/spotify-auth-start",
-    "/api/spotify-status",
-    "/api/spotify-library",
-    "/api/spotify-logout",
     "/api/prefetch",
     "/api/check-cache",
     "/api/stream-info",
@@ -89,15 +86,6 @@ impl RecentSet {
 }
 
 #[derive(Default)]
-pub struct SpotifyAuth {
-    pub verifier: String,
-    pub state: String,
-    pub client_id: String,
-    pub token: String,
-    pub error: String,
-}
-
-#[derive(Default)]
 pub struct Caches {
     pub search: HashMap<String, Timed<Value>>,
     pub stream_url: HashMap<String, (Instant, Value)>,
@@ -140,7 +128,6 @@ pub struct Ctx {
     pub prefetching: Mutex<HashSet<String>>,
     pub app_state: Mutex<Value>,
     pub sse: broadcast::Sender<String>,
-    pub spotify: Mutex<SpotifyAuth>,
     pub tools: Mutex<ToolsProgress>,
 }
 
@@ -182,7 +169,6 @@ impl Ctx {
             prefetching: Mutex::new(HashSet::new()),
             app_state: Mutex::new(json!({})),
             sse,
-            spotify: Mutex::new(SpotifyAuth::default()),
             tools: Mutex::new(ToolsProgress { status: "idle".into(), ..Default::default() }),
         })
     }
@@ -389,20 +375,8 @@ async fn route(ctx: SharedCtx, req: Req) -> Response {
         "/api/albums/search" => imports::handle_album_search(ctx, req).await,
         "/api/albums/tracks" => imports::handle_album_tracks(ctx, req).await,
         "/api/hot" => recommend::handle_hot_picks(ctx, req).await,
-        "/api/spotify-auth-start" => imports::handle_spotify_auth_start(ctx, req),
-        "/api/spotify-callback" => imports::handle_spotify_callback(ctx, req).await,
-        "/api/spotify-status" => {
-            let sp = ctx.spotify.lock();
-            json_response(200, &json!({ "connected": !sp.token.is_empty(), "error": sp.error }))
-        }
-        "/api/spotify-logout" => {
-            let mut sp = ctx.spotify.lock();
-            sp.token.clear();
-            sp.error.clear();
-            json_response(200, &json!({ "success": true }))
-        }
-        "/api/spotify-library" => imports::handle_spotify_library(ctx, req).await,
         "/api/search" => search::handle_search(ctx, req).await,
+        "/api/suggest" => search::handle_suggest(ctx, req).await,
         "/api/vibe" if post => recommend::handle_vibe(ctx, req).await,
         "/api/artist" => recommend::handle_artist(ctx, req).await,
         "/api/prefetch" => {

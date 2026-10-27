@@ -544,3 +544,58 @@ pub async fn handle_search(ctx: SharedCtx, req: Req) -> Response {
     schedule_prefetch(&ctx, result["tracks"].as_array().unwrap(), &platform, 60);
     json_response(200, &result)
 }
+
+async fn suggest_get(ctx: &SharedCtx, url: &str) -> Option<Value> {
+    let resp = ctx.http.get(url).header("User-Agent", BROWSER_UA).timeout(Duration::from_millis(3000)).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    serde_json::from_str(&resp.text().await.ok()?).ok()
+}
+
+async fn suggest_artists(ctx: &SharedCtx, term: &str) -> Vec<(String, String)> {
+    if term.is_empty() {
+        return vec![];
+    }
+    let url = format!("https://api.deezer.com/search/artist?q={}&limit=5", enc(term));
+    let Some(data) = suggest_get(ctx, &url).await else { return vec![] };
+    data.get("data")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().map(|x| (s(x, "name"), s(x, "picture_medium"))).filter(|(name, _)| !name.is_empty()).collect())
+        .unwrap_or_default()
+}
+
+pub async fn handle_suggest(ctx: SharedCtx, req: Req) -> Response {
+    let query = req.q("q");
+    let q = query.trim();
+    if q.chars().count() < 2 {
+        return json_response(200, &json!({ "success": true, "words": [], "artists": [] }));
+    }
+    let words_url = format!("https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q={}", enc(q));
+    let words: Vec<String> = suggest_get(&ctx, &words_url)
+        .await
+        .as_ref()
+        .and_then(|v| v.get(1))
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).filter(|w| !w.eq_ignore_ascii_case(q)).take(6).map(str::to_string).collect())
+        .unwrap_or_default();
+    // Searching the top suggested word ("coldplay" for "cold") finds the artist the prefix alone cannot.
+    let top = words.first().cloned().unwrap_or_default();
+    let (via_word, direct) = tokio::join!(suggest_artists(&ctx, &top), suggest_artists(&ctx, q));
+
+    let ql = q.to_lowercase();
+    let wl: Vec<String> = words.iter().map(|w| w.to_lowercase()).collect();
+    let mut seen = std::collections::HashSet::new();
+    let artists: Vec<Value> = via_word
+        .into_iter()
+        .chain(direct)
+        .filter(|(name, _)| {
+            let n = name.to_lowercase();
+            (n.starts_with(&ql) || wl.contains(&n)) && seen.insert(n)
+        })
+        .take(4)
+        .map(|(name, image)| json!({ "name": name, "image": image }))
+        .collect();
+    let words: Vec<Value> = words.into_iter().map(|w| json!(w)).collect();
+    json_response(200, &json!({ "success": true, "words": words, "artists": artists }))
+}

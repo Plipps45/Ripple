@@ -204,6 +204,7 @@ pub fn create_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     {
         set_taskbar_icon(&window);
         crate::thumbbar::install(app, &window);
+        allow_own_media_permission(&window);
     }
 
     let w = window.clone();
@@ -227,6 +228,31 @@ pub fn create_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         _ => {}
     });
     Ok(window)
+}
+
+// Chromium only names audio outputs once the page holds media permission; grant it to Ripple's own pages
+// so the output picker can list devices without a prompt. Remote content keeps the default behaviour.
+#[cfg(windows)]
+fn allow_own_media_permission(window: &WebviewWindow) {
+    let _ = window.with_webview(|wv| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::*;
+        let Ok(core) = wv.controller().CoreWebView2() else { return };
+        let handler = webview2_com::PermissionRequestedEventHandler::create(Box::new(|_, args| {
+            let Some(args) = args else { return Ok(()) };
+            let mut kind = COREWEBVIEW2_PERMISSION_KIND(0);
+            args.PermissionKind(&mut kind)?;
+            let mut uri = windows_core::PWSTR::null();
+            args.Uri(&mut uri)?;
+            let uri = webview2_com::take_pwstr(uri);
+            let own_page = uri.starts_with("http://tauri.localhost/") || uri.starts_with("https://tauri.localhost/");
+            if kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE && own_page {
+                args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW)?;
+            }
+            Ok(())
+        }));
+        let mut token = 0i64;
+        let _ = core.add_PermissionRequested(&handler, &mut token);
+    });
 }
 
 #[cfg(windows)]

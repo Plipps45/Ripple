@@ -6099,27 +6099,40 @@ body.intensity-zero .lyric-word.active-word { opacity: 1; color: var(--md-sys-co
   font-size: 13px;
   color: var(--md-sys-color-on-surface-variant);
   opacity: 0.8;
-  max-width: clamp(200px, 28vw, 320px);
+  max-width: clamp(220px, 30vw, 360px);
   overflow: hidden;
   white-space: nowrap;
   margin-top: 0;
   margin-bottom: -6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
   z-index: 5;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, background 0.2s ease;
+}
+
+.tvk-output:hover,
+.tvk-output:focus-visible {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
 }
 
 .tvk-output svg {
   flex-shrink: 0;
 }
 
+.tvk-output-chevron {
+  opacity: 0.7;
+}
+
 #tvk-output-name {
   display: inline-block;
-  max-width: clamp(100px, 15vw, 175px);
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
   vertical-align: middle;
 }
 
@@ -6748,8 +6761,7 @@ body.has-video-bg :is(.lyrics-header-actions, .right-panel .lyrics-header-action
   line-height: 1.5;
 }
 
-#btn-sp-pick-files,
-#btn-sp-login {
+#btn-sp-pick-files {
   background: var(--md-sys-color-surface-container-high);
   border: 1px solid var(--md-sys-color-outline-variant, rgba(255, 255, 255, 0.12));
   color: var(--md-sys-color-on-surface);
@@ -6765,20 +6777,12 @@ body.has-video-bg :is(.lyrics-header-actions, .right-panel .lyrics-header-action
   transition: background var(--transition-short, 0.2s), border-color var(--transition-short, 0.2s);
 }
 
-#btn-sp-pick-files:hover,
-#btn-sp-login:not(:disabled):hover {
+#btn-sp-pick-files:hover {
   background: var(--md-sys-color-surface-container-highest);
   border-color: var(--md-sys-color-outline);
 }
 
-#btn-sp-login:disabled {
-  opacity: 0.38;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-#sp-file-info,
-#sp-login-status {
+#sp-file-info {
   font-size: calc(13px * var(--font-scale, 1));
   color: var(--md-sys-color-on-surface-variant);
 }

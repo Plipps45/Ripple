@@ -2101,7 +2101,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     audioEngine.setHqSettings(state.hqSettings);
     audioEngine.setAudioSettings(state.audioSettings);
     audioEngine.setVolume(state.volume, state.isMuted);
-    
+    applyAudioSink().catch(() => {});
+
     startVisualizers();
   }
 
@@ -3209,9 +3210,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Fills the empty lyrics panel with the artist's picture and bio; cached per artist on the function itself.
+  async function renderLyricsMissing() {
+    const box = document.getElementById('lyrics-missing');
+    if (!box) return;
+    const track = state.currentTrack;
+    box.hidden = !track;
+    if (!track) return;
+    const cache = renderLyricsMissing.cache || (renderLyricsMissing.cache = new Map());
+    const artist = (firstArtist(track.artist) || track.artist || '').replace(/ - Topic|VEVO/gi, '').trim();
+    const key = artist.toLowerCase();
+    renderLyricsMissing.key = key;
+    const nameEl = document.getElementById('lyrics-missing-name');
+    const bioEl = document.getElementById('lyrics-missing-bio');
+    const avatarEl = document.getElementById('lyrics-missing-avatar');
+    const trackThumb = getTrackThumbUrl(track);
+    nameEl.textContent = artist || 'Unknown artist';
+    bioEl.textContent = '';
+    bioEl.classList.remove('expanded');
+    if (trackThumb) avatarEl.src = trackThumb;
+    else avatarEl.removeAttribute('src');
+    if (!artist) return;
+
+    let info = cache.get(key);
+    if (!info) {
+      try {
+        const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/artist?name=${encodeURIComponent(artist)}`);
+        const data = await res.json();
+        info = data.success && data.artist
+          ? { name: data.artist.name || artist, bio: (data.artist.bio || '').replace(/<[^>]*>/g, '').trim(), avatar: data.artist.avatar || '' }
+          : { name: artist, bio: '', avatar: '' };
+        cache.set(key, info);
+      } catch (e) {
+        return;
+      }
+    }
+    if (renderLyricsMissing.key !== key) return;
+    nameEl.textContent = info.name;
+    bioEl.textContent = info.bio;
+    if (info.avatar) avatarEl.src = info.avatar;
+  }
+
   function setLyricsEmpty(isEmpty) {
     const panel = el.rightPanel || document.getElementById('right-panel');
     if (!panel) return;
+    if (isEmpty) renderLyricsMissing();
     const currentlyEmpty = panel.classList.contains('lyrics-empty');
     if (currentlyEmpty === !!isEmpty) {
       syncTvLayout();
@@ -4263,6 +4306,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncTvLayout();
   }
 
+  function getSavedAudioSink() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ripple_audio_sink') || 'null');
+      return saved && typeof saved.id === 'string' && saved.id ? saved : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function canChooseAudioSink() {
+    return 'setSinkId' in HTMLMediaElement.prototype
+      && (!window.AudioContext || 'setSinkId' in AudioContext.prototype)
+      && !!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices);
+  }
+
+  // Playback runs through the Web Audio graph, so the AudioContext needs the sink as well as the <audio> element.
+  async function applyAudioSink() {
+    const id = (getSavedAudioSink() || {}).id || '';
+    const targets = [el.nativeAudio, audioEngine.ctx].filter(t => t && typeof t.setSinkId === 'function' && t.sinkId !== id);
+    try {
+      await Promise.all(targets.map(t => t.setSinkId(id)));
+    } catch (e) {
+      if (!id) return;
+      // The chosen device is gone (unplugged or disabled): go back to the system default.
+      localStorage.removeItem('ripple_audio_sink');
+      await applyAudioSink();
+    }
+  }
+
+  async function listAudioOutputs(askForNames) {
+    const outputs = async () => (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput');
+    let list = await outputs();
+    if (askForNames && list.every(d => !d.label)) {
+      // Device names stay hidden until the page holds media permission; the stream is released right away.
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(t => t.stop());
+        list = await outputs();
+      } catch (e) {}
+    }
+    return list.filter(d => d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications');
+  }
+
+  async function openAudioOutputMenu() {
+    const trigger = document.getElementById('tvk-output');
+    if (!trigger) return;
+    if (!canChooseAudioSink()) {
+      showToast("This system doesn't support choosing the audio output", 'info');
+      return;
+    }
+    const outputs = await listAudioOutputs(true).catch(() => []);
+    const currentId = (getSavedAudioSink() || {}).id || '';
+    const choose = (id, label) => async () => {
+      if (id) localStorage.setItem('ripple_audio_sink', JSON.stringify({ id, label }));
+      else localStorage.removeItem('ripple_audio_sink');
+      await applyAudioSink();
+      updateTvkOutput();
+    };
+    const items = [
+      { label: 'System default', icon: currentId ? 'speaker' : 'check', run: choose('', '') },
+      ...outputs.map(d => ({ label: d.label || 'Unnamed device', icon: d.deviceId === currentId ? 'check' : 'speaker', run: choose(d.deviceId, d.label) }))
+    ];
+    const r = trigger.getBoundingClientRect();
+    const nameEl = document.getElementById('tvk-output-name');
+    openContextMenu(r.left, r.bottom + 6, { title: 'Audio output', artist: nameEl ? nameEl.textContent : '' }, items);
+    if (!outputs.length) showToast('No other audio outputs found', 'info');
+  }
+
   let tvkOutputInterval = null;
   async function updateTvkOutput() {
     const nameEl = document.getElementById('tvk-output-name');
@@ -4272,10 +4383,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const outputContainer = document.getElementById('tvk-output');
     if (!nameEl) return;
 
-    let deviceName = '';
+    const savedSink = getSavedAudioSink();
+    let deviceName = savedSink ? savedSink.label || '' : '';
     let batteryLevel = null;
 
-    if (window.electronAPI && typeof window.electronAPI.getAudioOutputInfo === 'function') {
+    if (!savedSink && window.electronAPI && typeof window.electronAPI.getAudioOutputInfo === 'function') {
       try {
         const info = await window.electronAPI.getAudioOutputInfo();
         if (info && info.name && info.name !== 'Default output') {
@@ -4287,7 +4399,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch (e) {}
     }
 
-    if (!deviceName) {
+    if (!deviceName && !savedSink) {
       try {
         const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/audio-output-info`);
         if (res.ok) {
@@ -4306,8 +4418,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
-        const audioEl = el.nativeAudio || document.getElementById('native-audio');
-        const sinkId = (audioEl && audioEl.sinkId) ? audioEl.sinkId : '';
+        const sinkId = savedSink ? savedSink.id : '';
 
         let matched = null;
         if (sinkId) {
@@ -4325,7 +4436,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch (e) {}
     }
 
-    const finalName = deviceName || 'Default output';
+    const finalName = deviceName || 'System default';
     nameEl.textContent = finalName;
     if (outputContainer) outputContainer.title = finalName;
 
@@ -4473,7 +4584,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === 'function') {
     navigator.mediaDevices.addEventListener('devicechange', () => {
-      updateTvkOutput();
+      applyAudioSink().catch(() => {}).then(updateTvkOutput);
+    });
+  }
+
+  const tvkOutputEl = document.getElementById('tvk-output');
+  if (tvkOutputEl) {
+    tvkOutputEl.addEventListener('click', openAudioOutputMenu);
+    tvkOutputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openAudioOutputMenu();
+      }
     });
   }
 
@@ -4975,6 +5097,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (el.btnCloseCustomLyrics) el.btnCloseCustomLyrics.addEventListener('click', closeCustomLyricsEditor);
   if (el.btnCancelCustomLyrics) el.btnCancelCustomLyrics.addEventListener('click', closeCustomLyricsEditor);
   if (el.btnSaveCustomLyrics) el.btnSaveCustomLyrics.addEventListener('click', saveCustomLyrics);
+
+  const lyricsImportInput = document.getElementById('lyrics-import-input');
+  const btnLyricsImportFile = document.getElementById('btn-lyrics-import-file');
+  const btnLyricsPaste = document.getElementById('btn-lyrics-paste');
+  if (btnLyricsPaste) btnLyricsPaste.addEventListener('click', openCustomLyricsEditor);
+  if (btnLyricsImportFile && lyricsImportInput) {
+    btnLyricsImportFile.addEventListener('click', () => {
+      if (!state.currentTrack) return showToast('Play a track first to add lyrics', 'info');
+      lyricsImportInput.value = '';
+      lyricsImportInput.click();
+    });
+    lyricsImportInput.addEventListener('change', async () => {
+      const file = lyricsImportInput.files && lyricsImportInput.files[0];
+      if (!file || !state.currentTrack || !el.customLyricsTextarea) return;
+      if (file.size > 512 * 1024) return showToast('That file is too large to be lyrics', 'error');
+      // LRC header tags like [ar:...] or [length:...] would otherwise show up as lyric lines.
+      const text = (await file.text())
+        .replace(/^﻿/, '')
+        .split(/\r?\n/)
+        .filter(line => !/^\[[a-z#]+:[^\]]*\]\s*$/i.test(line.trim()))
+        .join('\n')
+        .trim();
+      if (!text) return showToast('No lyrics found in that file', 'error');
+      el.customLyricsTextarea.value = text;
+      saveCustomLyrics();
+    });
+  }
+  const lyricsMissingName = document.getElementById('lyrics-missing-name');
+  if (lyricsMissingName) {
+    lyricsMissingName.addEventListener('click', () => {
+      if (lyricsMissingName.textContent) openArtistProfile(lyricsMissingName.textContent);
+    });
+  }
+  const lyricsMissingBio = document.getElementById('lyrics-missing-bio');
+  if (lyricsMissingBio) lyricsMissingBio.addEventListener('click', () => lyricsMissingBio.classList.toggle('expanded'));
 
   if (el.customLyricsModal) {
     el.customLyricsModal.addEventListener('click', (e) => {
@@ -6207,6 +6364,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function performSearch(query) {
     if (!query || !query.trim()) return;
+    hideSearchSuggest();
 
     const searchToken = (state.searchToken || 0) + 1;
     state.searchToken = searchToken;
@@ -6629,7 +6787,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>',
     artist: '<circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path>',
     edit: '<path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>',
-    remove: '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>'
+    remove: '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>',
+    speaker: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>',
+    check: '<polyline points="20 6 9 17 4 12"></polyline>'
   };
   let ctxMenu = null;
 
@@ -6769,6 +6929,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const items = trackMenuItems(track, null, null).filter(item => item === 'sep' || item.icon !== 'next' && item.icon !== 'queue');
       items.splice(items.indexOf('sep') + 1, 0, { label: 'Edit title and artist…', icon: 'edit', run: () => document.getElementById('btn-edit-current-track').click() });
       openContextMenu(e.clientX, e.clientY, track, items);
+      return;
+    }
+    const plTarget = target.closest('.playlist-item[data-playlist-id], .playlist-detail-header');
+    const pl = plTarget && state.playlists.find(p => p.id === (plTarget.dataset.playlistId || state.currentPlaylistId));
+    if (pl) {
+      openContextMenu(e.clientX, e.clientY, { title: pl.name, artist: `${(pl.tracks || []).length} tracks` }, [
+        { label: 'Rename playlist…', icon: 'edit', run: () => openRenamePlaylistModal(pl.id) }
+      ]);
       return;
     }
     closeContextMenu();
@@ -8258,6 +8426,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     savePlaylistCover(playlistId, null);
   }
 
+  let renamePlaylistId = null;
+  const renamePlaylistModal = document.getElementById('rename-playlist-modal');
+  const renamePlaylistInput = document.getElementById('rename-playlist-name');
+
+  function openRenamePlaylistModal(playlistId) {
+    const pl = state.playlists.find(p => p.id === playlistId);
+    if (!pl || !renamePlaylistModal) return;
+    renamePlaylistId = playlistId;
+    renamePlaylistInput.value = pl.name;
+    openModal(renamePlaylistModal);
+    renamePlaylistInput.focus();
+    renamePlaylistInput.select();
+  }
+
+  function renamePlaylist(playlistId, name) {
+    const pl = state.playlists.find(p => p.id === playlistId);
+    const next = (name || '').trim();
+    if (!pl || !next || next === pl.name) return;
+    pl.name = next;
+    localStorage.setItem('ripple_playlists', JSON.stringify(state.playlists));
+    if (state.currentView === 'playlist-detail' && state.currentPlaylistId === playlistId) openPlaylistDetail(playlistId);
+    else renderPlaylistsList();
+  }
+
+  const btnRenamePlaylist = document.getElementById('btn-rename-playlist');
+  if (btnRenamePlaylist) btnRenamePlaylist.addEventListener('click', () => openRenamePlaylistModal(state.currentPlaylistId));
+  document.getElementById('btn-cancel-rename-playlist').addEventListener('click', () => closeModal(renamePlaylistModal));
+  document.getElementById('btn-confirm-rename-playlist').addEventListener('click', () => {
+    renamePlaylist(renamePlaylistId, renamePlaylistInput.value);
+    closeModal(renamePlaylistModal);
+  });
+  renamePlaylistInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-confirm-rename-playlist').click();
+    if (e.key === 'Escape') closeModal(renamePlaylistModal);
+  });
+
   function openPlaylistDetail(playlistId) {
     const pl = state.playlists.find(p => p.id === playlistId);
     if (!pl) return;
@@ -9006,6 +9210,101 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (artistCardContainer) artistCardContainer.innerHTML = '';
         if (typeof syncHomeAmbientVisibility === 'function') syncHomeAmbientVisibility();
       }
+    });
+  }
+
+  const searchSuggestBox = document.getElementById('search-suggest');
+  let searchSuggestItems = [];
+  let searchSuggestActive = -1;
+  let searchSuggestTimer = null;
+  let searchSuggestToken = 0;
+
+  function hideSearchSuggest() {
+    searchSuggestToken++;
+    searchSuggestItems = [];
+    searchSuggestActive = -1;
+    if (searchSuggestBox) {
+      searchSuggestBox.classList.add('hidden');
+      searchSuggestBox.innerHTML = '';
+    }
+  }
+
+  function setSearchSuggestActive(i) {
+    searchSuggestActive = i;
+    searchSuggestBox.querySelectorAll('.search-suggest-item').forEach((btn, n) => btn.classList.toggle('active', n === i));
+  }
+
+  function pickSearchSuggest(item) {
+    if (!item || !el.searchInput) return;
+    el.searchInput.value = item.text;
+    if (el.searchClearBtn) el.searchClearBtn.classList.remove('hidden');
+    hideSearchSuggest();
+    if (item.kind === 'artist') openArtistProfile(item.text);
+    else performSearch(item.text);
+  }
+
+  function renderSearchSuggest(words, artists) {
+    searchSuggestItems = [
+      ...artists.map(a => ({ kind: 'artist', text: a.name, image: a.image })),
+      ...words.map(w => ({ kind: 'word', text: w }))
+    ];
+    if (!searchSuggestItems.length) return hideSearchSuggest();
+    searchSuggestBox.innerHTML = searchSuggestItems.map(item => `
+      <button type="button" class="search-suggest-item" role="option">
+        ${item.kind === 'artist'
+          ? `<span class="search-suggest-thumb">${item.image ? `<img src="${escapeHtml(item.image)}" alt="" loading="lazy">` : ''}</span>`
+          : `<span class="search-suggest-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg></span>`}
+        <span class="search-suggest-text">${escapeHtml(item.text)}</span>
+        <span class="search-suggest-kind">${item.kind === 'artist' ? 'Artist' : 'Search'}</span>
+      </button>`).join('');
+    searchSuggestBox.classList.remove('hidden');
+    setSearchSuggestActive(-1);
+  }
+
+  async function fetchSearchSuggest(query) {
+    const token = ++searchSuggestToken;
+    try {
+      const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/suggest?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (token !== searchSuggestToken || !el.searchInput || el.searchInput.value.trim() !== query) return;
+      renderSearchSuggest(data.words || [], data.artists || []);
+    } catch (e) {
+      if (token === searchSuggestToken) hideSearchSuggest();
+    }
+  }
+
+  if (el.searchInput && searchSuggestBox) {
+    el.searchInput.addEventListener('input', () => {
+      clearTimeout(searchSuggestTimer);
+      const query = el.searchInput.value.trim();
+      if (query.length < 2) return hideSearchSuggest();
+      searchSuggestTimer = setTimeout(() => fetchSearchSuggest(query), 180);
+    });
+    el.searchInput.addEventListener('keydown', (e) => {
+      if (searchSuggestBox.classList.contains('hidden')) return;
+      const count = searchSuggestItems.length;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const next = e.key === 'ArrowDown' ? (searchSuggestActive + 1) % count : (searchSuggestActive <= 0 ? count - 1 : searchSuggestActive - 1);
+        setSearchSuggestActive(next);
+      } else if (e.key === 'Enter' && searchSuggestActive >= 0) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        pickSearchSuggest(searchSuggestItems[searchSuggestActive]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        hideSearchSuggest();
+      }
+    }, true);
+    searchSuggestBox.addEventListener('mousedown', (e) => e.preventDefault());
+    searchSuggestBox.addEventListener('click', (e) => {
+      const btn = e.target.closest('.search-suggest-item');
+      if (btn) pickSearchSuggest(searchSuggestItems[[...searchSuggestBox.children].indexOf(btn)]);
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('.search-box-wrapper')) hideSearchSuggest();
     });
   }
 
@@ -12267,36 +12566,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const spFileInfo = document.getElementById('sp-file-info');
   const spChkLikes = document.getElementById('sp-chk-likes');
   const spChkPlaylists = document.getElementById('sp-chk-playlists');
-  const spClientIdInput = document.getElementById('sp-client-id');
-  const btnSpLogin = document.getElementById('btn-sp-login');
-  const spRedirectUri = document.getElementById('sp-redirect-uri');
-  const spLoginStatus = document.getElementById('sp-login-status');
-  const spChkLikes2 = document.getElementById('sp-chk-likes-2');
-  const spChkPlaylists2 = document.getElementById('sp-chk-playlists-2');
   let currentSpotifyImportMode = 'link';
   let parsedSpotifyExport = { likes: [], playlists: [] };
-  let spLoginPollTimer = null;
-  let spotifyConnected = false;
-
-  async function checkSpotifyAuthStatus() {
-    try {
-      const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/spotify-status`);
-      const data = await res.json();
-      spotifyConnected = !!data.connected;
-      if (spLoginStatus) {
-        if (spotifyConnected) {
-          spLoginStatus.textContent = 'Connected';
-          spLoginStatus.style.color = 'var(--md-sys-color-primary, #6750A4)';
-        } else {
-          spLoginStatus.textContent = data.error || 'Not connected';
-          spLoginStatus.style.color = data.error ? 'var(--md-sys-color-error, #ba1a1a)' : 'var(--md-sys-color-outline)';
-        }
-      }
-      if (currentSpotifyImportMode === 'login' && btnConfirmSpotifyImport && btnConfirmSpotifyImport.dataset.action !== 'done') {
-        btnConfirmSpotifyImport.disabled = !spotifyConnected;
-      }
-    } catch (e) {}
-  }
 
   function classifyImportError(provider, statusOrError, body) {
     let status = typeof statusOrError === 'number' ? statusOrError : 0;
@@ -12388,12 +12659,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       spotifyStatus.textContent = '';
       spotifyStatus.style.color = '';
     }
-    if (currentSpotifyImportMode === 'login') {
-      checkSpotifyAuthStatus();
-    } else {
-      if (btnConfirmSpotifyImport && btnConfirmSpotifyImport.dataset.action !== 'done') {
-        btnConfirmSpotifyImport.disabled = false;
-      }
+    if (btnConfirmSpotifyImport && btnConfirmSpotifyImport.dataset.action !== 'done') {
+      btnConfirmSpotifyImport.disabled = false;
     }
   }
 
@@ -12402,111 +12669,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.addEventListener('click', () => {
         setSpotifyImportMode(btn.dataset.mode);
       });
-    });
-  }
-
-  if (spClientIdInput) {
-    const savedId = localStorage.getItem('ripple_spotify_client_id') || '';
-    spClientIdInput.value = savedId;
-    if (btnSpLogin) {
-      btnSpLogin.disabled = !/^[a-f0-9]{32}$/i.test(savedId.trim());
-    }
-    spClientIdInput.addEventListener('input', () => {
-      const val = spClientIdInput.value.trim();
-      localStorage.setItem('ripple_spotify_client_id', val);
-      if (btnSpLogin) {
-        btnSpLogin.disabled = !/^[a-f0-9]{32}$/i.test(val);
-      }
-    });
-  }
-
-  if (btnSpLogin) {
-    btnSpLogin.addEventListener('click', async () => {
-      const clientId = spClientIdInput ? spClientIdInput.value.trim() : '';
-      if (!/^[a-f0-9]{32}$/i.test(clientId)) {
-        if (spLoginStatus) {
-          spLoginStatus.textContent = 'Invalid Client ID';
-          spLoginStatus.style.color = 'var(--md-sys-color-error, #ba1a1a)';
-        }
-        return;
-      }
-
-      if (spLoginStatus) {
-        spLoginStatus.textContent = 'Starting login...';
-        spLoginStatus.style.color = 'var(--md-sys-color-on-surface-variant)';
-      }
-
-      try {
-        const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/spotify-auth-start?clientId=${encodeURIComponent(clientId)}`);
-        const data = await res.json();
-        if (!data.success) {
-          if (spLoginStatus) {
-            spLoginStatus.textContent = data.error || 'Failed to start auth';
-            spLoginStatus.style.color = 'var(--md-sys-color-error, #ba1a1a)';
-          }
-          return;
-        }
-
-        if (spRedirectUri && data.redirectUri) {
-          spRedirectUri.textContent = data.redirectUri;
-        }
-
-        if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
-          window.electronAPI.openExternal(data.url);
-        } else {
-          window.open(data.url, '_blank');
-        }
-
-        if (spLoginStatus) {
-          spLoginStatus.textContent = 'Waiting for login in browser...';
-          spLoginStatus.style.color = 'var(--md-sys-color-on-surface-variant)';
-        }
-
-        if (spLoginPollTimer) clearInterval(spLoginPollTimer);
-        let elapsed = 0;
-        spLoginPollTimer = setInterval(async () => {
-          elapsed += 2000;
-          if (elapsed > 180000) {
-            clearInterval(spLoginPollTimer);
-            spLoginPollTimer = null;
-            if (spLoginStatus) {
-              spLoginStatus.textContent = 'Login timed out';
-              spLoginStatus.style.color = 'var(--md-sys-color-error, #ba1a1a)';
-            }
-            return;
-          }
-          try {
-            const sRes = await fetch(`http://127.0.0.1:${state.serverPort}/api/spotify-status`);
-            const sData = await sRes.json();
-            if (sData.error) {
-              clearInterval(spLoginPollTimer);
-              spLoginPollTimer = null;
-              if (spLoginStatus) {
-                spLoginStatus.textContent = sData.error;
-                spLoginStatus.style.color = 'var(--md-sys-color-error, #ba1a1a)';
-              }
-              return;
-            }
-            if (sData.connected) {
-              clearInterval(spLoginPollTimer);
-              spLoginPollTimer = null;
-              spotifyConnected = true;
-              if (spLoginStatus) {
-                spLoginStatus.textContent = 'Connected';
-                spLoginStatus.style.color = 'var(--md-sys-color-primary, #6750A4)';
-              }
-              if (currentSpotifyImportMode === 'login' && btnConfirmSpotifyImport) {
-                btnConfirmSpotifyImport.disabled = false;
-              }
-            }
-          } catch (e) {}
-        }, 2000);
-      } catch (err) {
-        if (spLoginStatus) {
-          spLoginStatus.textContent = err.message || 'Error connecting to server';
-          spLoginStatus.style.color = 'var(--md-sys-color-error, #ba1a1a)';
-        }
-      }
     });
   }
 
@@ -12576,20 +12738,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function openSpotifyImportModal() {
     if (!spotifyModal) return;
-    if (spLoginPollTimer) { clearInterval(spLoginPollTimer); spLoginPollTimer = null; }
     setSpotifyImportMode('link');
     parsedSpotifyExport = { likes: [], playlists: [] };
     if (spFileInput) spFileInput.value = '';
     if (spFileInfo) spFileInfo.textContent = 'No files selected';
     if (spChkLikes) { spChkLikes.checked = true; spChkLikes.disabled = false; }
     if (spChkPlaylists) { spChkPlaylists.checked = true; spChkPlaylists.disabled = false; }
-    if (spChkLikes2) { spChkLikes2.checked = true; spChkLikes2.disabled = false; }
-    if (spChkPlaylists2) { spChkPlaylists2.checked = true; spChkPlaylists2.disabled = false; }
     if (btnSpPickFiles) btnSpPickFiles.disabled = false;
-    const savedId = localStorage.getItem('ripple_spotify_client_id') || '';
-    if (spClientIdInput) spClientIdInput.value = savedId;
-    if (btnSpLogin) btnSpLogin.disabled = !/^[a-f0-9]{32}$/i.test(savedId.trim());
-    if (spRedirectUri) spRedirectUri.textContent = `http://127.0.0.1:${state.serverPort || 38472}/api/spotify-callback`;
     if (spotifyImportUrl) {
       spotifyImportUrl.value = '';
       spotifyImportUrl.disabled = false;
@@ -12649,7 +12804,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function closeSpotifyImportModal() {
-    if (spLoginPollTimer) { clearInterval(spLoginPollTimer); spLoginPollTimer = null; }
     if (spotifyModal) closeModal(spotifyModal);
   }
 
@@ -12671,11 +12825,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btnConfirmSpotifyImport) btnConfirmSpotifyImport.disabled = true;
     if (btnCancelSpotifyImport) btnCancelSpotifyImport.disabled = true;
     if (btnSpPickFiles) btnSpPickFiles.disabled = true;
-    if (btnSpLogin) btnSpLogin.disabled = true;
     if (spChkLikes) spChkLikes.disabled = true;
     if (spChkPlaylists) spChkPlaylists.disabled = true;
-    if (spChkLikes2) spChkLikes2.disabled = true;
-    if (spChkPlaylists2) spChkPlaylists2.disabled = true;
 
     if (spotifyProgressWrap) spotifyProgressWrap.classList.remove('hidden');
     if (spotifyProgressLabel) spotifyProgressLabel.textContent = `0 / ${totalItemsCount}`;
@@ -12760,11 +12911,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (btnCancelSpotifyImport) btnCancelSpotifyImport.disabled = false;
     } finally {
       if (btnSpPickFiles) btnSpPickFiles.disabled = false;
-      if (btnSpLogin && spClientIdInput) btnSpLogin.disabled = !/^[a-f0-9]{32}$/i.test(spClientIdInput.value.trim());
       if (spChkLikes) spChkLikes.disabled = false;
       if (spChkPlaylists) spChkPlaylists.disabled = false;
-      if (spChkLikes2) spChkLikes2.disabled = false;
-      if (spChkPlaylists2) spChkPlaylists2.disabled = false;
       if (hasBusy && typeof endBusy === 'function') endBusy('import');
     }
   }
@@ -12795,69 +12943,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await runSpotifyImport({ likes: likesToImport, playlists: playlistsToImport });
   }
 
-  async function handleSpotifyLoginImport() {
-    const doLikes = !!(spChkLikes2 && spChkLikes2.checked);
-    const doPlaylists = !!(spChkPlaylists2 && spChkPlaylists2.checked);
-
-    if (!doLikes && !doPlaylists) {
-      if (spotifyStatus) {
-        spotifyStatus.textContent = 'Select at least Liked songs or Playlists';
-        spotifyStatus.style.color = 'var(--md-sys-color-error, #ba1a1a)';
-        spotifyStatus.classList.remove('hidden');
-      }
-      return;
-    }
-
-    if (spotifyStatus) {
-      spotifyStatus.textContent = 'Fetching Spotify library...';
-      spotifyStatus.style.color = 'var(--md-sys-color-primary, #6750A4)';
-      spotifyStatus.classList.remove('hidden');
-    }
-    if (btnConfirmSpotifyImport) btnConfirmSpotifyImport.disabled = true;
-    if (btnCancelSpotifyImport) btnCancelSpotifyImport.disabled = true;
-
-    try {
-      const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/spotify-library?likes=${doLikes ? 1 : 0}&playlists=${doPlaylists ? 1 : 0}`);
-      const data = await res.json();
-      if (!data.success) {
-        if (spotifyStatus) {
-          spotifyStatus.textContent = data.error || 'Failed to fetch Spotify library';
-          spotifyStatus.style.color = 'var(--md-sys-color-error, #ba1a1a)';
-          spotifyStatus.classList.remove('hidden');
-        }
-        if (btnConfirmSpotifyImport) btnConfirmSpotifyImport.disabled = false;
-        if (btnCancelSpotifyImport) btnCancelSpotifyImport.disabled = false;
-        return;
-      }
-
-      if (!(data.likes?.length || data.playlists?.some(pl => pl.tracks?.length))) {
-        if (spotifyStatus) {
-          spotifyStatus.textContent = data.skippedPlaylists?.length
-            ? `${data.skippedPlaylists.length} playlist(s) skipped: Spotify denied access to their tracks. In Development Mode only playlists you own or collaborate on are available. Try a playlist link or Export files.`
-            : 'No tracks found in your Spotify library';
-          spotifyStatus.style.color = 'var(--md-sys-color-error, #ba1a1a)';
-          spotifyStatus.classList.remove('hidden');
-        }
-        if (btnConfirmSpotifyImport) btnConfirmSpotifyImport.disabled = false;
-        if (btnCancelSpotifyImport) btnCancelSpotifyImport.disabled = false;
-        return;
-      }
-      await runSpotifyImport({ likes: data.likes || [], playlists: data.playlists || [] });
-      if (data.skippedPlaylists?.length && spotifyStatus && btnConfirmSpotifyImport?.dataset.action === 'done') {
-        spotifyStatus.textContent += ` · ${data.skippedPlaylists.length} playlist(s) skipped: Spotify denied track access (in Development Mode, only owned or collaborative playlists are available).`;
-        spotifyStatus.classList.remove('hidden');
-      }
-    } catch (err) {
-      if (spotifyStatus) {
-        spotifyStatus.textContent = err.message || 'Failed to fetch Spotify library';
-        spotifyStatus.style.color = 'var(--md-sys-color-error, #ba1a1a)';
-        spotifyStatus.classList.remove('hidden');
-      }
-      if (btnConfirmSpotifyImport) btnConfirmSpotifyImport.disabled = false;
-      if (btnCancelSpotifyImport) btnCancelSpotifyImport.disabled = false;
-    }
-  }
-
   async function handleSpotifyImportAction() {
     if (btnConfirmSpotifyImport && btnConfirmSpotifyImport.dataset.action === 'done') {
       closeSpotifyImportModal();
@@ -12866,10 +12951,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (currentSpotifyImportMode === 'file') {
       return handleSpotifyFileImport();
-    }
-
-    if (currentSpotifyImportMode === 'login') {
-      return handleSpotifyLoginImport();
     }
 
     const url = spotifyImportUrl ? spotifyImportUrl.value.trim() : '';

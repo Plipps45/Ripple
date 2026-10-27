@@ -3,9 +3,11 @@
 ## Ripple {tag}
 
 ### Changes
-- The sidebar has a new Import playlist button above Hide menu. It opens a small panel to choose the source: Spotify, YouTube, YouTube Music, SoundCloud or Apple Music.
-- Each option opens the same import dialog used in Settings > Integrations.
-- The README installation commands for Debian and Fedora now use the current package names.
+- The search box shows suggestions while typing: matching artists with their picture and related searches. They can be chosen with the mouse or the arrow keys.
+- Playlists can be renamed from the Rename button in the playlist view or from the right-click menu on the playlist in the sidebar or its header.
+- When a track has no lyrics, the lyrics panel shows the artist picture and biography, a notice that no lyrics were found, and options to import a `.lrc` or `.txt` file or paste the lyrics. Imported `.lrc` files keep their timing.
+- The audio output label in the fullscreen view is no longer cut off. On Windows it opens a menu to choose the output device, and the choice is kept between sessions.
+- The Hide menu button stays inside the sidebar on short windows.
 
 ### Installation
 | Platform | File |

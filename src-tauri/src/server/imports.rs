@@ -1,20 +1,16 @@
 use super::search::{strip_topic, BROWSER_UA};
 use super::textutil::*;
-use super::{html_response, json_response, ytdlp, Req, SharedCtx, Timed};
+use super::{json_response, ytdlp, Req, SharedCtx, Timed};
 use crate::logger;
 use axum::response::Response;
-use base64::Engine;
-use rand::RngCore;
 use regex::Regex;
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
 const SPOTIFY_PATHFINDER_URL: &str = "https://api-partner.spotify.com/pathfinder/v1/query";
 const SPOTIFY_FETCH_PLAYLIST_HASH: &str = "8964e8eafb21aa992a7d951d256d83285c04be2105d209262901de70cb97584a";
-const SPOTIFY_SCOPES: &str = "user-library-read playlist-read-private playlist-read-collaborative";
 const FIREFOX_UA: &str = "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0";
 
 macro_rules! re {
@@ -46,7 +42,6 @@ re!(EP_SUFFIX, r"(?i)\s-\s*EP$");
 re!(DASH_SPACED, r"\s+-\s+");
 re!(BY_WORD, r"(?i)(?-u:\b)by(?-u:\b)");
 re!(NON_ALNUM, r"[^\p{L}\p{N}]");
-re!(CLIENT_ID, r"(?i)^[a-f0-9]{32}$");
 
 fn spotify_error(status: u16, code: &str, error: &str) -> Response {
     json_response(status, &json!({ "success": false, "code": code, "error": error }))
@@ -145,130 +140,6 @@ async fn fetch_full_spotify_playlist(ctx: &SharedCtx, playlist_id: &str, token: 
     Ok(Some((tracks, total)))
 }
 
-pub struct ApiResp {
-    pub status: u16,
-    pub retry_after: Option<u64>,
-    pub body: String,
-}
-
-async fn spotify_api_get(ctx: &SharedCtx, url: &str, token: &str) -> Result<ApiResp, String> {
-    let resp = ctx
-        .http
-        .get(url)
-        .header("Authorization", format!("Bearer {token}"))
-        .header("User-Agent", BROWSER_UA)
-        .timeout(Duration::from_secs(15))
-        .send()
-        .await
-        .map_err(|e| if e.is_timeout() { "Spotify API timed out".into() } else { e.to_string() })?;
-    let status = resp.status().as_u16();
-    let retry_after = resp.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(|v| v.parse().ok());
-    Ok(ApiResp { status, retry_after, body: resp.text().await.unwrap_or_default() })
-}
-
-async fn spotify_get_with_retry(ctx: &SharedCtx, url: &str, token: &str) -> Result<ApiResp, String> {
-    let resp = spotify_api_get(ctx, url, token).await?;
-    if resp.status == 429 {
-        tokio::time::sleep(Duration::from_secs(resp.retry_after.unwrap_or(1).max(1))).await;
-        return spotify_api_get(ctx, url, token).await;
-    }
-    Ok(resp)
-}
-
-fn spotify_api_failure(resp: &ApiResp, endpoint: &str) -> String {
-    let detail = serde_json::from_str::<Value>(&resp.body)
-        .ok()
-        .and_then(|v| v.get("error").cloned())
-        .map(|e| if e.is_string() { js_string(&e) } else { s(&e, "message") })
-        .unwrap_or_default();
-    format!("Spotify {endpoint} returned HTTP {}{}", resp.status, if detail.is_empty() { String::new() } else { format!(": {detail}") })
-}
-
-fn api_track(it: &Value) -> Option<Value> {
-    let t = it.get("item").filter(|v| truthy(v)).or_else(|| it.get("track").filter(|v| truthy(v)))?;
-    if t.get("is_local").map(truthy).unwrap_or(false) || s(t, "type") == "episode" {
-        return None;
-    }
-    let artist = t.pointer("/artists/0/name").map(js_string).unwrap_or_default();
-    let title = s(t, "name");
-    if title.is_empty() {
-        return None;
-    }
-    let mut o = json!({ "title": title, "artist": artist });
-    if let Some(d) = t.get("duration_ms").filter(|v| truthy(v)).and_then(ms_to_s) {
-        o["duration"] = jnum(d);
-    }
-    Some(o)
-}
-
-async fn try_spotify_web_api(ctx: &SharedCtx, playlist_id: &str) -> Option<Value> {
-    let token = ctx.spotify.lock().token.clone();
-    if token.is_empty() {
-        return None;
-    }
-    let resp = spotify_get_with_retry(ctx, &format!("https://api.spotify.com/v1/playlists/{}", enc(playlist_id)), &token).await.ok()?;
-    if !(200..300).contains(&resp.status) {
-        return None;
-    }
-    let d: Value = serde_json::from_str(&resp.body).ok()?;
-    let name = s(&d, "name");
-    let cover = d.pointer("/images/0/url").map(js_string).unwrap_or_default();
-    let pl_items = d.get("items").filter(|v| truthy(v)).or_else(|| d.get("tracks")).cloned().unwrap_or(json!({}));
-    let mut items: Vec<Value> = arr(&pl_items, "items").to_vec();
-    let mut next = pl_items.get("next").and_then(Value::as_str).map(str::to_string);
-    let mut guard = 0;
-    while let Some(url) = next.take() {
-        guard += 1;
-        if guard > 100 {
-            break;
-        }
-        let Ok(r) = spotify_get_with_retry(ctx, &url, &token).await else { break };
-        if !(200..300).contains(&r.status) {
-            break;
-        }
-        let Ok(nd) = serde_json::from_str::<Value>(&r.body) else { break };
-        let page = arr(&nd, "items");
-        if page.is_empty() {
-            break;
-        }
-        items.extend(page.iter().cloned());
-        next = nd.get("next").and_then(Value::as_str).map(str::to_string);
-    }
-    let tracks: Vec<Value> = items
-        .iter()
-        .filter_map(|it| {
-            let t = it.get("item").filter(|v| truthy(v)).or_else(|| it.get("track").filter(|v| truthy(v))).unwrap_or(it);
-            let title = s(t, "name");
-            if title.is_empty() {
-                return None;
-            }
-            let artist = t.get("artists").and_then(Value::as_array).map(|a| a.iter().map(|x| s(x, "name")).collect::<Vec<_>>().join(", ")).unwrap_or_default();
-            let mut o = json!({ "title": title, "artist": artist });
-            if let Some(dur) = t.get("duration_ms").filter(|v| truthy(v)).and_then(ms_to_s) {
-                o["duration"] = jnum(dur);
-            }
-            Some(o)
-        })
-        .collect();
-    let total = pl_items.get("total").filter(|v| truthy(v)).and_then(Value::as_f64).unwrap_or(tracks.len() as f64);
-    Some(json!({ "success": true, "name": if name.is_empty() { "Spotify Playlist".into() } else { name }, "cover": cover, "tracks": tracks, "total": jnum(total) }))
-}
-
-fn api_fallback_response(mut fb: Value, cover_fallback: Option<&str>, limited: Option<bool>) -> Response {
-    let total = num(&fb, "total");
-    let count = fb["tracks"].as_array().map(|a| a.len()).unwrap_or(0) as f64;
-    fb["hasMore"] = json!(total > count);
-    if let Some(c) = cover_fallback {
-        if s(&fb, "cover").is_empty() {
-            fb["cover"] = json!(c);
-        }
-    }
-    if let Some(l) = limited {
-        fb["limited"] = json!(l);
-    }
-    json_response(200, &fb)
-}
-
 async fn fetch_spotify_embed(ctx: &SharedCtx, playlist_id: &str, ua: &str) -> Result<(u16, String), String> {
     let url = format!("https://open.spotify.com/embed/playlist/{playlist_id}");
     let r = get_text(
@@ -350,9 +221,6 @@ pub async fn handle_spotify_import(ctx: SharedCtx, req: Req) -> Response {
     let (status, body) = match embed {
         Ok(r) => r,
         Err(_) => {
-            if let Some(fb) = try_spotify_web_api(&ctx, &playlist_id).await.filter(|f| !arr(f, "tracks").is_empty()) {
-                return api_fallback_response(fb, None, None);
-            }
             return spotify_error(500, "spotify_error", "Network error connecting to Spotify");
         }
     };
@@ -360,25 +228,16 @@ pub async fn handle_spotify_import(ctx: SharedCtx, req: Req) -> Response {
     match status {
         404 => return spotify_error(404, "spotify_not_found", "Playlist not found"),
         403 => {
-            if let Some(fb) = try_spotify_web_api(&ctx, &playlist_id).await.filter(|f| !arr(f, "tracks").is_empty()) {
-                return api_fallback_response(fb, None, None);
-            }
             return spotify_error(403, "spotify_forbidden", "Spotify refused request (403)");
         }
         429 => return spotify_error(429, "spotify_rate_limited", "Spotify rate limited (429)"),
         200 => {}
         other => {
-            if let Some(fb) = try_spotify_web_api(&ctx, &playlist_id).await.filter(|f| !arr(f, "tracks").is_empty()) {
-                return api_fallback_response(fb, None, None);
-            }
             return spotify_error(if other == 0 { 500 } else { other }, "spotify_error", &format!("Spotify returned status {other}"));
         }
     }
 
     let Some(next_data) = NEXT_DATA.captures(&body).and_then(|c| c.get(1)) else {
-        if let Some(fb) = try_spotify_web_api(&ctx, &playlist_id).await.filter(|f| !arr(f, "tracks").is_empty()) {
-            return api_fallback_response(fb, None, None);
-        }
         let private = PRIVATE_WORD.is_match(&body);
         return spotify_error(403, if private { "spotify_forbidden" } else { "spotify_error" }, if private { "Private playlist" } else { "Could not parse playlist" });
     };
@@ -451,209 +310,11 @@ pub async fn handle_spotify_import(ctx: SharedCtx, req: Req) -> Response {
         });
     }
     if tracks.is_empty() {
-        if let Some(fb) = try_spotify_web_api(&ctx, &playlist_id).await.filter(|f| !arr(f, "tracks").is_empty()) {
-            return api_fallback_response(fb, Some(&cover), Some(limited));
-        }
         let private = PRIVATE_WORD.is_match(&body) || PRIVATE_WORD.is_match(&page_props.to_string());
         return spotify_error(403, if private { "spotify_forbidden" } else { "spotify_error" }, if private { "Private playlist" } else { "Could not read tracks" });
     }
     let has_more = total > tracks.len() as f64;
     json_response(200, &json!({ "success": true, "name": name, "cover": cover, "tracks": tracks, "hasMore": has_more, "total": jnum(total), "limited": limited }))
-}
-
-fn b64url(bytes: &[u8]) -> String {
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
-}
-
-fn redirect_uri(ctx: &SharedCtx) -> String {
-    format!("{}/api/spotify-callback", ctx.base())
-}
-
-pub fn handle_spotify_auth_start(ctx: SharedCtx, req: Req) -> Response {
-    let client_id = req.q("clientId");
-    if !CLIENT_ID.is_match(&client_id) {
-        return json_response(400, &json!({ "success": false, "error": "Invalid Client ID" }));
-    }
-    let mut rng = rand::thread_rng();
-    let mut vbytes = [0u8; 48];
-    rng.fill_bytes(&mut vbytes);
-    let verifier = b64url(&vbytes);
-    let challenge = b64url(&Sha256::digest(verifier.as_bytes()));
-    let mut sbytes = [0u8; 16];
-    rng.fill_bytes(&mut sbytes);
-    let state = hex::encode(sbytes);
-    {
-        let mut sp = ctx.spotify.lock();
-        *sp = super::SpotifyAuth { verifier, state: state.clone(), client_id: client_id.clone(), token: String::new(), error: String::new() };
-    }
-    let redirect = redirect_uri(&ctx);
-    let url = format!(
-        "https://accounts.spotify.com/authorize?response_type=code&client_id={}&scope={}&redirect_uri={}&state={}&code_challenge_method=S256&code_challenge={}",
-        enc(&client_id),
-        enc(SPOTIFY_SCOPES),
-        enc(&redirect),
-        enc(&state),
-        enc(&challenge)
-    );
-    json_response(200, &json!({ "success": true, "url": url, "redirectUri": redirect }))
-}
-
-const FAIL_PAGE: &str = "<!DOCTYPE html><html><body><p>Spotify login failed. Return to Ripple for details.</p></body></html>";
-
-pub async fn handle_spotify_callback(ctx: SharedCtx, req: Req) -> Response {
-    let (code, state, err) = (req.q("code"), req.q("state"), req.q("error"));
-    let (verifier, client_id) = {
-        let mut sp = ctx.spotify.lock();
-        if sp.state.is_empty() || state.is_empty() || state != sp.state {
-            return html_response(400, "<!DOCTYPE html><html><body><p>Invalid Spotify login session.</p></body></html>");
-        }
-        if !err.is_empty() || code.is_empty() {
-            sp.error = if err == "access_denied" {
-                "Spotify authorization was denied.".into()
-            } else {
-                "Spotify login failed. Check the Client ID, allowed account and redirect URI.".into()
-            };
-            sp.state.clear();
-            return html_response(400, FAIL_PAGE);
-        }
-        (sp.verifier.clone(), sp.client_id.clone())
-    };
-    let redirect = redirect_uri(&ctx);
-    let form = [
-        ("grant_type", "authorization_code"),
-        ("code", code.as_str()),
-        ("redirect_uri", redirect.as_str()),
-        ("client_id", client_id.as_str()),
-        ("code_verifier", verifier.as_str()),
-    ];
-    let body = url::form_urlencoded::Serializer::new(String::new()).extend_pairs(form).finish();
-    let result = ctx
-        .http
-        .post("https://accounts.spotify.com/api/token")
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .timeout(Duration::from_secs(15))
-        .body(body)
-        .send()
-        .await;
-    let sp_state = |f: &dyn Fn(&mut super::SpotifyAuth)| f(&mut ctx.spotify.lock());
-    match result {
-        Ok(resp) => {
-            let status = resp.status().as_u16();
-            let data: Value = resp.text().await.ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
-            let token = s(&data, "access_token");
-            if (200..300).contains(&status) && !token.is_empty() {
-                sp_state(&|sp| {
-                    sp.state.clear();
-                    sp.token = token.clone();
-                });
-                html_response(200, "<!DOCTYPE html><html><body><p>Ripple is connected to Spotify. You can close this tab.</p></body></html>")
-            } else {
-                let reason = first_str(&[&data["error_description"], &data["error"]]);
-                let reason = if reason.is_empty() { format!("HTTP {status}") } else { reason };
-                sp_state(&|sp| {
-                    sp.state.clear();
-                    sp.error = format!("Spotify token exchange failed: {reason}");
-                });
-                html_response(400, FAIL_PAGE)
-            }
-        }
-        Err(e) => {
-            let msg = if e.is_timeout() { "Token exchange timed out".to_string() } else { e.to_string() };
-            sp_state(&|sp| {
-                sp.state.clear();
-                sp.error = format!("Could not reach Spotify: {msg}");
-            });
-            html_response(500, FAIL_PAGE)
-        }
-    }
-}
-
-async fn collect_pages(ctx: &SharedCtx, first: ApiResp, token: &str, endpoint: &str, cap: usize) -> Result<(Vec<Value>, bool), String> {
-    let mut out = Vec::new();
-    let mut resp = first;
-    loop {
-        if resp.status == 403 {
-            return Ok((out, true));
-        }
-        if !(200..300).contains(&resp.status) {
-            return Err(spotify_api_failure(&resp, endpoint));
-        }
-        let Ok(data) = serde_json::from_str::<Value>(&resp.body) else { break };
-        for it in arr(&data, "items") {
-            if let Some(t) = api_track(it) {
-                out.push(t);
-                if out.len() >= cap {
-                    return Ok((out, false));
-                }
-            }
-        }
-        match data.get("next").and_then(Value::as_str) {
-            Some(next) => resp = spotify_get_with_retry(ctx, next, token).await?,
-            None => break,
-        }
-    }
-    Ok((out, false))
-}
-
-pub async fn handle_spotify_library(ctx: SharedCtx, req: Req) -> Response {
-    let token = ctx.spotify.lock().token.clone();
-    if token.is_empty() {
-        return json_response(401, &json!({ "success": false, "error": "Unauthorized" }));
-    }
-    let want_likes = matches!(req.q("likes").as_str(), "1" | "true");
-    let want_playlists = matches!(req.q("playlists").as_str(), "1" | "true");
-
-    let run = async {
-        let mut likes = Vec::new();
-        let mut playlists = Vec::new();
-        let mut skipped: Vec<String> = Vec::new();
-        if want_likes {
-            let first = spotify_get_with_retry(&ctx, "https://api.spotify.com/v1/me/tracks?limit=50", &token).await?;
-            if !(200..300).contains(&first.status) {
-                return Err(spotify_api_failure(&first, "saved tracks"));
-            }
-            likes = collect_pages(&ctx, first, &token, "saved tracks", 5000).await?.0;
-        }
-        if want_playlists {
-            let mut user_playlists = Vec::new();
-            let mut next = Some("https://api.spotify.com/v1/me/playlists?limit=50".to_string());
-            while let Some(url) = next.take() {
-                let resp = spotify_get_with_retry(&ctx, &url, &token).await?;
-                if !(200..300).contains(&resp.status) {
-                    return Err(spotify_api_failure(&resp, "playlists"));
-                }
-                let Ok(data) = serde_json::from_str::<Value>(&resp.body) else { break };
-                for pl in arr(&data, "items") {
-                    let (id, name) = (s(pl, "id"), s(pl, "name"));
-                    if !id.is_empty() && !name.is_empty() {
-                        user_playlists.push((id, name));
-                    }
-                }
-                next = data.get("next").and_then(Value::as_str).map(str::to_string);
-            }
-            for (id, name) in user_playlists {
-                let mut resp = spotify_get_with_retry(&ctx, &format!("https://api.spotify.com/v1/playlists/{}/items?limit=50", enc(&id)), &token).await?;
-                if resp.status == 404 || resp.status == 400 {
-                    resp = spotify_get_with_retry(&ctx, &format!("https://api.spotify.com/v1/playlists/{}/tracks?limit=50", enc(&id)), &token).await?;
-                }
-                if resp.status == 403 {
-                    skipped.push(name);
-                    continue;
-                }
-                let (tracks, was_skipped) = collect_pages(&ctx, resp, &token, &format!("playlist items ({name})"), usize::MAX).await?;
-                if was_skipped {
-                    skipped.push(name);
-                } else {
-                    playlists.push(json!({ "name": name, "tracks": tracks }));
-                }
-            }
-        }
-        Ok::<_, String>(json!({ "success": true, "likes": likes, "playlists": playlists, "skippedPlaylists": skipped }))
-    };
-    match run.await {
-        Ok(v) => json_response(200, &v),
-        Err(e) => json_response(if e.contains("returned HTTP 403") { 403 } else { 500 }, &json!({ "success": false, "error": e })),
-    }
 }
 
 async fn fetch_html_with_redirects(ctx: &SharedCtx, url: &str) -> Result<(u16, String), String> {
